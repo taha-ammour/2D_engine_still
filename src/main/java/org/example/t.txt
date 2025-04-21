@@ -1,0 +1,92 @@
+# Improved Game Engine Architecture
+
+## Core Principles
+1. **Clean Separation of Concerns** - Each system handles a specific aspect of the game
+2. **Intuitive API** - Easy to understand and use by developers
+3. **Performance Optimized** - Efficient rendering with batching and spatial partitioning
+4. **Z-Order Focused Rendering** - First-class support for depth sorting
+5. **Resource Management** - Centralized handling of assets and memory
+
+## Top-Level Architecture
+
+```
+[GameEngine]
+    |
+    ├── [RenderSystem] - Handles all rendering with proper Z-ordering
+    │     ├── Renderer - Low-level rendering operations
+    │     ├── SpriteRenderer - Optimized sprite batch rendering
+    │     ├── TextRenderer - Text rendering
+    │     └── DebugRenderer - Visualization for debugging
+    │
+    ├── [ResourceSystem] - Asset loading and management
+    │     ├── TextureManager - Loads and caches textures
+    │     ├── ShaderManager - Loads and caches shaders
+    │     ├── SpriteManager - Manages sprite definitions
+    │     └── FontManager - Manages font resources
+    │
+    ├── [SceneSystem] - Scene organization and management
+    │     ├── Scene - Container for game objects
+    │     ├── GameObject - Base entity class
+    │     ├── Component - Component-based architecture
+    │     └── Spatial Partitioning - For efficient object culling
+    │
+    ├── [InputSystem] - Handles user input
+    │     ├── KeyboardInput - Keyboard handling
+    │     ├── MouseInput - Mouse handling
+    │     └── GamepadInput - Controller handling
+    │
+    ├── [PhysicsSystem] - Physics and collision
+    │     ├── CollisionSystem - Detects collisions
+    │     ├── Rigidbody - Physics properties
+    │     └── Collider - Collision shapes
+    │
+    ├── [AudioSystem] - Sound effects and music
+    │     ├── AudioSource - Sound emitter
+    │     ├── AudioListener - Sound receiver
+    │     └── AudioClip - Sound resource
+    │
+    └── [NetworkSystem] - Multiplayer functionality
+          ├── Client - Client-side networking
+          ├── Server - Server hosting
+          └── Packets - Network message handling
+```
+
+## Z-Order Rendering Approach
+
+The rendering system will use a specialized approach to ensure proper Z-ordering:
+
+1. **Depth Buffer** - Use OpenGL depth buffer for basic Z-ordering
+2. **Manual Sorting** - Pre-sort objects by Z value before rendering
+3. **Render Layers** - Group objects into layers for efficient batch rendering
+4. **Optimized Batching** - Batch similar objects at same Z level
+5. **Transparent Handling** - Special handling for transparent objects (render back-to-front)
+
+## Key Improvements
+
+1. **Component-Based Architecture**
+   - GameObject holds components instead of inheritance
+   - More flexible than deep inheritance hierarchies
+   - Easier to compose game objects
+
+2. **Efficient Resource Management**
+   - Deduplication of assets and resources
+   - Reference counting for automatic cleanup
+   - Asset hot-reloading capabilities
+
+3. **Event System**
+   - Observer pattern for loosely coupled communication
+   - Reduces direct dependencies between systems
+
+4. **Optimized Rendering**
+   - Sprite batching to reduce draw calls
+   - Shader instance caching
+   - Frustum culling to skip off-screen objects
+
+5. **Memory Management**
+   - Better memory pooling for frequently created objects
+   - Explicit resource lifetimes and cleanup
+
+6. **Simplified API**
+   - Consistent naming conventions
+   - Builder pattern for complex objects
+   - Fluent interfaces for chaining operations

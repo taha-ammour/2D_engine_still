@@ -1,0 +1,362 @@
+package org.example.engine.rendering;
+
+import org.example.engine.core.Component;
+import org.example.engine.core.GameObject;
+import org.example.engine.core.Transform;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
+import org.lwjgl.BufferUtils;
+
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.*;
+
+/**
+ * Sprite component that handles rendering a 2D image with proper Z-ordering.
+ * This implementation supports palette swapping, flipping, and lighting.
+ */
+public class Sprite extends Component implements Renderable {
+    // Sprite properties
+    private Texture texture;
+    private final float width;
+    private final float height;
+    private final float u0, v0, u1, v1; // UV coordinates
+
+    // Rendering properties
+    private Material material;
+    private boolean flipX = false;
+    private boolean flipY = false;
+    private float alpha = 1.0f;
+    private boolean isTransparent = false;
+
+    // Buffers and handles
+    private int vao;
+    private int vbo;
+    private int ebo;
+
+    // Palette for palette swapping
+    private float[] paletteColors = new float[12]; // 4 colors × 3 components (RGB)
+
+    // Cached matrices to avoid allocation
+    private final Matrix4f modelMatrix = new Matrix4f();
+    private final FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
+
+    // Color/tint
+    private Vector4f color = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+    /**
+     * Create a sprite with the given texture and dimensions
+     */
+    public Sprite(Texture texture, float width, float height) {
+        this(texture, 0, 0, 1, 1, width, height);
+    }
+
+    /**
+     * Create a sprite with the given texture, UV coordinates, and dimensions
+     */
+    public Sprite(Texture texture, float u0, float v0, float u1, float v1, float width, float height) {
+        this.texture = texture;
+        this.u0 = u0;
+        this.v0 = v0;
+        this.u1 = u1;
+        this.v1 = v1;
+        this.width = width;
+        this.height = height;
+
+        // Default palette (grayscale)
+        for (int i = 0; i < 4; i++) {
+            float value = i / 3.0f; // 0, 0.33, 0.67, 1.0
+            paletteColors[i*3] = value;
+            paletteColors[i*3+1] = value;
+            paletteColors[i*3+2] = value;
+        }
+
+        // Get default shader
+        ShaderManager.Shader shader = ShaderManager.getInstance().getShader("sprite");
+        if (shader == null) {
+            shader = ShaderManager.getInstance().loadShader("sprite", "/shaders/sprite.vs.glsl", "/shaders/sprite.fs.glsl");
+        }
+
+        // Create material with the shader
+        material = new Material(shader);
+
+        // Create the mesh
+        createMesh();
+    }
+
+    /**
+     * Create the sprite mesh (quad)
+     */
+    private void createMesh() {
+        // Vertex data: positions, UVs, and normals
+        float[] vertices = {
+                // Position (x,y,z), UV (u,v), Normal (nx,ny,nz)
+                0.0f,       0.0f,        0.0f, u0, v0, 0.0f, 0.0f, 1.0f,
+                width,      0.0f,        0.0f, u1, v0, 0.0f, 0.0f, 1.0f,
+                width,      height,      0.0f, u1, v1, 0.0f, 0.0f, 1.0f,
+                0.0f,       height,      0.0f, u0, v1, 0.0f, 0.0f, 1.0f
+        };
+
+        // Index data (for two triangles forming a quad)
+        int[] indices = {
+                0, 1, 2,  // First triangle
+                2, 3, 0   // Second triangle
+        };
+
+        // Create and bind VAO
+        vao = glGenVertexArrays();
+        glBindVertexArray(vao);
+
+        // Create and bind VBO
+        vbo = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertices.length);
+        vertexBuffer.put(vertices).flip();
+        glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW);
+
+        // Create and bind EBO
+        ebo = glGenBuffers();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        IntBuffer indexBuffer = BufferUtils.createIntBuffer(indices.length);
+        indexBuffer.put(indices).flip();
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_STATIC_DRAW);
+
+        // Set up vertex attributes
+        // Position (3 floats)
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
+        glEnableVertexAttribArray(0);
+
+        // Texture coordinates (2 floats)
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, 8 * Float.BYTES, 3 * Float.BYTES);
+        glEnableVertexAttribArray(1);
+
+        // Normal (3 floats)
+        glVertexAttribPointer(2, 3, GL_FLOAT, false, 8 * Float.BYTES, 5 * Float.BYTES);
+        glEnableVertexAttribArray(2);
+
+        // Unbind VAO
+        glBindVertexArray(0);
+    }
+
+    @Override
+    public void render(RenderSystem renderSystem, Matrix4f viewProjectionMatrix) {
+        if (texture == null || !isActive()) return;
+
+        // Calculate model matrix based on transform
+        Transform transform = getGameObject().getTransform();
+        modelMatrix.identity()
+                .translate(transform.getPosition())
+                .rotateZ(transform.getRotation())
+                .scale(transform.getScale().x, transform.getScale().y, 1.0f);
+
+        // Combine with view-projection matrix
+        Matrix4f mvpMatrix = new Matrix4f(viewProjectionMatrix).mul(modelMatrix);
+
+        // Bind shader and set uniforms
+        ShaderManager.Shader shader = material.getShader();
+        shader.use();
+
+        // Set MVP matrix
+        mvpMatrix.get(matrixBuffer);
+        shader.setUniformMatrix4fv("u_MVP", matrixBuffer);
+
+        // Set model matrix
+        modelMatrix.get(matrixBuffer);
+        shader.setUniformMatrix4fv("u_Model", matrixBuffer);
+
+        // Set texture
+        texture.bind(0);
+        shader.setUniform1i("u_Texture", 0);
+
+        // Set palette colors
+        shader.setUniform3fv("u_Palette", paletteColors);
+
+        // Set flip flags
+        shader.setUniform1i("u_flipX", flipX ? 1 : 0);
+        shader.setUniform1i("u_flipY", flipY ? 1 : 0);
+
+        // Set texture coordinates
+        shader.setUniform4f("u_texCoords", u0, v0, u1, v1);
+
+        // Set color/tint
+        shader.setUniform4f("u_Color", color.x, color.y, color.z, color.w * alpha);
+
+        // Set view position for lighting calculations
+        Vector3f viewPos = renderSystem.getCamera().getPosition();
+        shader.setUniform3f("u_ViewPos", viewPos.x, viewPos.y, viewPos.z);
+
+        // Draw the sprite
+        glBindVertexArray(vao);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        // Unbind shader
+        glUseProgram(0);
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Clean up resources
+        glDeleteBuffers(vbo);
+        glDeleteBuffers(ebo);
+        glDeleteVertexArrays(vao);
+    }
+
+    @Override
+    public float getZ() {
+        return getGameObject().getTransform().getPosition().z;
+    }
+
+    @Override
+    public float getWidth() {
+        return width * getGameObject().getTransform().getScale().x;
+    }
+
+    @Override
+    public float getHeight() {
+        return height * getGameObject().getTransform().getScale().y;
+    }
+
+    @Override
+    public Transform getTransform() {
+        return getGameObject().getTransform();
+    }
+
+    @Override
+    public boolean isTransparent() {
+        return isTransparent || color.w * alpha < 0.99f;
+    }
+
+    @Override
+    public Material getMaterial() {
+        return material;
+    }
+
+    /**
+     * Set the palette colors for palette swapping
+     * @param paletteCodes Array of 4 color codes (as "000" to "555")
+     */
+    public void setPaletteFromCodes(String[] paletteCodes) {
+        if (paletteCodes == null || paletteCodes.length != 4) {
+            throw new IllegalArgumentException("Expected exactly 4 palette codes");
+        }
+
+        for (int i = 0; i < 4; i++) {
+            String code = paletteCodes[i].trim();
+            if (code.length() != 3) {
+                throw new IllegalArgumentException("Palette code at index " + i + " must be exactly 3 characters long");
+            }
+
+            // Convert from "012" format to RGB [0.0-1.0] values
+            paletteColors[i*3] = (code.charAt(0) - '0') / 5.0f;
+            paletteColors[i*3+1] = (code.charAt(1) - '0') / 5.0f;
+            paletteColors[i*3+2] = (code.charAt(2) - '0') / 5.0f;
+        }
+    }
+
+    /**
+     * Set the sprite's color/tint
+     * @param color Color in RGB format (0xRRGGBB)
+     * @param alpha Alpha value [0.0-1.0]
+     */
+    public void setColor(int color, float alpha) {
+        // Extract RGB components from the color int
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+
+        this.color.set(r, g, b, 1.0f);
+        this.alpha = alpha;
+    }
+
+    /**
+     * Set whether the sprite should be flipped horizontally
+     */
+    public void setFlipX(boolean flip) {
+        this.flipX = flip;
+    }
+
+    /**
+     * Set whether the sprite should be flipped vertically
+     */
+    public void setFlipY(boolean flip) {
+        this.flipY = flip;
+    }
+
+    /**
+     * Set the sprite's transparency (alpha value)
+     */
+    public void setAlpha(float alpha) {
+        this.alpha = alpha;
+    }
+
+    /**
+     * Mark this sprite as using transparency
+     */
+    public void setTransparent(boolean transparent) {
+        this.isTransparent = transparent;
+    }
+
+    /**
+     * Get the texture's normalized UV coordinates
+     */
+    public float getU0() { return u0; }
+    public float getV0() { return v0; }
+    public float getU1() { return u1; }
+    public float getV1() { return v1; }
+
+    /**
+     * Create a copy of this sprite
+     */
+    public Sprite copy() {
+        Sprite copy = new Sprite(texture, u0, v0, u1, v1, width, height);
+        copy.setPaletteColors(paletteColors.clone());
+        copy.setColor((int)(color.x * 255) << 16 | (int)(color.y * 255) << 8 | (int)(color.z * 255), alpha);
+        copy.setFlipX(flipX);
+        copy.setFlipY(flipY);
+        copy.setTransparent(isTransparent);
+        return copy;
+    }
+
+    // Getters and setters
+
+    public Texture getTexture() {
+        return texture;
+    }
+
+    public void setTexture(Texture texture) {
+        this.texture = texture;
+    }
+
+    public void setPaletteColors(float[] paletteColors) {
+        if (paletteColors.length != 12) {
+            throw new IllegalArgumentException("Palette must have exactly 12 values (4 colors × RGB)");
+        }
+        System.arraycopy(paletteColors, 0, this.paletteColors, 0, 12);
+    }
+
+    public float[] getPaletteColors() {
+        return paletteColors.clone();
+    }
+
+    public boolean isFlipX() {
+        return flipX;
+    }
+
+    public boolean isFlipY() {
+        return flipY;
+    }
+
+    public float getAlpha() {
+        return alpha;
+    }
+
+    public Vector4f getColor() {
+        return new Vector4f(color);
+    }
+}
