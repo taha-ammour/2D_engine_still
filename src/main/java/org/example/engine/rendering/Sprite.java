@@ -49,6 +49,9 @@ public class Sprite extends Component implements Renderable {
     // Color/tint
     private Vector4f color = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 
+    // Debug flags
+    private boolean verboseLogging = true;
+
     /**
      * Create a sprite with the given texture and dimensions
      */
@@ -68,6 +71,12 @@ public class Sprite extends Component implements Renderable {
         this.width = width;
         this.height = height;
 
+        if (verboseLogging) {
+            System.out.println("Creating sprite with dimensions: " + width + "x" + height);
+            System.out.println("UVs: (" + u0 + "," + v0 + ") to (" + u1 + "," + v1 + ")");
+            System.out.println("Texture: " + (texture != null ? texture.getId() : "null"));
+        }
+
         // Default palette (grayscale)
         for (int i = 0; i < 4; i++) {
             float value = i / 3.0f; // 0, 0.33, 0.67, 1.0
@@ -79,124 +88,235 @@ public class Sprite extends Component implements Renderable {
         // Get default shader
         ShaderManager.Shader shader = ShaderManager.getInstance().getShader("sprite");
         if (shader == null) {
-            shader = ShaderManager.getInstance().loadShader("sprite", "/shaders/sprite.vs.glsl", "/shaders/sprite.fs.glsl");
+            System.err.println("WARNING: Sprite shader not found, will try to create a default one");
+            shader = createDefaultShader();
+        } else if (verboseLogging) {
+            System.out.println("Using sprite shader with ID: " + shader.getProgramId());
         }
 
         // Create material with the shader
         material = new Material(shader);
+        if (verboseLogging) {
+            System.out.println("Created material with shader: " + (shader != null ? shader.getProgramId() : "null"));
+        }
 
         // Create the mesh
         createMesh();
     }
 
     /**
+     * Create a default shader if the main one is not available
+     */
+    private ShaderManager.Shader createDefaultShader() {
+        try {
+            String vertexSource =
+                    "#version 330 core\n" +
+                            "layout (location = 0) in vec3 aPos;\n" +
+                            "layout (location = 1) in vec2 aTexCoord;\n" +
+                            "uniform mat4 u_MVP;\n" +
+                            "out vec2 TexCoord;\n" +
+                            "void main() {\n" +
+                            "    gl_Position = u_MVP * vec4(aPos, 1.0);\n" +
+                            "    TexCoord = aTexCoord;\n" +
+                            "}\n";
+
+            String fragmentSource =
+                    "#version 330 core\n" +
+                            "in vec2 TexCoord;\n" +
+                            "out vec4 FragColor;\n" +
+                            "uniform vec4 u_Color;\n" +
+                            "uniform sampler2D u_Texture;\n" +
+                            "void main() {\n" +
+                            "    vec4 texColor = texture(u_Texture, TexCoord);\n" +
+                            "    if (texColor.a < 0.01) {\n" +
+                            "        FragColor = u_Color;\n" +
+                            "    } else {\n" +
+                            "        FragColor = texColor * u_Color;\n" +
+                            "    }\n" +
+                            "}\n";
+
+            ShaderManager.Shader shader = new ShaderManager.Shader(vertexSource, fragmentSource);
+            ShaderManager.getInstance().addShader("sprite", shader);
+            System.out.println("Created default sprite shader");
+            return shader;
+        } catch (Exception e) {
+            System.err.println("ERROR: Failed to create default shader: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
      * Create the sprite mesh (quad)
      */
     private void createMesh() {
-        // Vertex data: positions, UVs, and normals
-        float[] vertices = {
-                // Position (x,y,z), UV (u,v), Normal (nx,ny,nz)
-                0.0f,       0.0f,        0.0f, u0, v0, 0.0f, 0.0f, 1.0f,
-                width,      0.0f,        0.0f, u1, v0, 0.0f, 0.0f, 1.0f,
-                width,      height,      0.0f, u1, v1, 0.0f, 0.0f, 1.0f,
-                0.0f,       height,      0.0f, u0, v1, 0.0f, 0.0f, 1.0f
-        };
+        if (verboseLogging) {
+            System.out.println("Creating sprite mesh");
+        }
 
-        // Index data (for two triangles forming a quad)
-        int[] indices = {
-                0, 1, 2,  // First triangle
-                2, 3, 0   // Second triangle
-        };
+        try {
+            // Vertex data: positions, UVs, and normals
+            float[] vertices = {
+                    // Position (x,y,z), UV (u,v), Normal (nx,ny,nz)
+                    0.0f,       0.0f,        0.0f, u0, v0, 0.0f, 0.0f, 1.0f,
+                    width,      0.0f,        0.0f, u1, v0, 0.0f, 0.0f, 1.0f,
+                    width,      height,      0.0f, u1, v1, 0.0f, 0.0f, 1.0f,
+                    0.0f,       height,      0.0f, u0, v1, 0.0f, 0.0f, 1.0f
+            };
 
-        // Create and bind VAO
-        vao = glGenVertexArrays();
-        glBindVertexArray(vao);
+            // Index data (for two triangles forming a quad)
+            int[] indices = {
+                    0, 1, 2,  // First triangle
+                    2, 3, 0   // Second triangle
+            };
 
-        // Create and bind VBO
-        vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertices.length);
-        vertexBuffer.put(vertices).flip();
-        glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW);
+            // Create and bind VAO
+            vao = glGenVertexArrays();
+            glBindVertexArray(vao);
 
-        // Create and bind EBO
-        ebo = glGenBuffers();
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        IntBuffer indexBuffer = BufferUtils.createIntBuffer(indices.length);
-        indexBuffer.put(indices).flip();
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_STATIC_DRAW);
+            // Create and bind VBO
+            vbo = glGenBuffers();
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertices.length);
+            vertexBuffer.put(vertices).flip();
+            glBufferData(GL_ARRAY_BUFFER, vertexBuffer, GL_STATIC_DRAW);
 
-        // Set up vertex attributes
-        // Position (3 floats)
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
-        glEnableVertexAttribArray(0);
+            // Create and bind EBO
+            ebo = glGenBuffers();
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+            IntBuffer indexBuffer = BufferUtils.createIntBuffer(indices.length);
+            indexBuffer.put(indices).flip();
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_STATIC_DRAW);
 
-        // Texture coordinates (2 floats)
-        glVertexAttribPointer(1, 2, GL_FLOAT, false, 8 * Float.BYTES, 3 * Float.BYTES);
-        glEnableVertexAttribArray(1);
+            // Set up vertex attributes
+            // Position (3 floats)
+            glVertexAttribPointer(0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
+            glEnableVertexAttribArray(0);
 
-        // Normal (3 floats)
-        glVertexAttribPointer(2, 3, GL_FLOAT, false, 8 * Float.BYTES, 5 * Float.BYTES);
-        glEnableVertexAttribArray(2);
+            // Texture coordinates (2 floats)
+            glVertexAttribPointer(1, 2, GL_FLOAT, false, 8 * Float.BYTES, 3 * Float.BYTES);
+            glEnableVertexAttribArray(1);
 
-        // Unbind VAO
-        glBindVertexArray(0);
+            // Normal (3 floats)
+            glVertexAttribPointer(2, 3, GL_FLOAT, false, 8 * Float.BYTES, 5 * Float.BYTES);
+            glEnableVertexAttribArray(2);
+
+            // Unbind VAO
+            glBindVertexArray(0);
+
+            if (verboseLogging) {
+                System.out.println("Sprite mesh created with VAO: " + vao + ", VBO: " + vbo + ", EBO: " + ebo);
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR creating sprite mesh: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void render(RenderSystem renderSystem, Matrix4f viewProjectionMatrix) {
-        if (texture == null || !isActive()) return;
+        if (!isActive()) {
+            if (verboseLogging) {
+                System.out.println("Sprite not active, skipping render");
+            }
+            return;
+        }
 
-        // Calculate model matrix based on transform
-        Transform transform = getGameObject().getTransform();
-        modelMatrix.identity()
-                .translate(transform.getPosition())
-                .rotateZ(transform.getRotation())
-                .scale(transform.getScale().x, transform.getScale().y, 1.0f);
+        try {
+            if (verboseLogging) {
+                System.out.println("Rendering sprite with texture: " + (texture != null ? texture.getId() : "null"));
+            }
 
-        // Combine with view-projection matrix
-        Matrix4f mvpMatrix = new Matrix4f(viewProjectionMatrix).mul(modelMatrix);
+            // Calculate model matrix based on transform
+            Transform transform = getGameObject().getTransform();
+            if (transform == null) {
+                System.err.println("ERROR: Transform is null for GameObject: " +
+                        (getGameObject() != null ? getGameObject().getName() : "null"));
+                return;
+            }
 
-        // Bind shader and set uniforms
-        ShaderManager.Shader shader = material.getShader();
-        shader.use();
+            // Log transform data for debugging
+            if (verboseLogging) {
+                Vector3f position = transform.getPosition();
+                System.out.println("Transform position: " + position.x + ", " + position.y + ", " + position.z);
+                System.out.println("Transform rotation: " + transform.getRotation());
+                System.out.println("Transform scale: " + transform.getScale().x + ", " + transform.getScale().y);
+            }
 
-        // Set MVP matrix
-        mvpMatrix.get(matrixBuffer);
-        shader.setUniformMatrix4fv("u_MVP", matrixBuffer);
+            modelMatrix.identity()
+                    .translate(transform.getPosition())
+                    .rotateZ(transform.getRotation())
+                    .scale(transform.getScale().x, transform.getScale().y, 1.0f);
 
-        // Set model matrix
-        modelMatrix.get(matrixBuffer);
-        shader.setUniformMatrix4fv("u_Model", matrixBuffer);
+            // Combine with view-projection matrix
+            Matrix4f mvpMatrix = new Matrix4f(viewProjectionMatrix).mul(modelMatrix);
 
-        // Set texture
-        texture.bind(0);
-        shader.setUniform1i("u_Texture", 0);
+            // Bind shader and set uniforms
+            ShaderManager.Shader shader = material.getShader();
+            if (shader == null) {
+                System.err.println("ERROR: Shader is null for sprite material");
+                return;
+            }
 
-        // Set palette colors
-        shader.setUniform3fv("u_Palette", paletteColors);
+            shader.use();
 
-        // Set flip flags
-        shader.setUniform1i("u_flipX", flipX ? 1 : 0);
-        shader.setUniform1i("u_flipY", flipY ? 1 : 0);
+            // Set MVP matrix
+            mvpMatrix.get(matrixBuffer);
+            shader.setUniformMatrix4fv("u_MVP", matrixBuffer);
 
-        // Set texture coordinates
-        shader.setUniform4f("u_texCoords", u0, v0, u1, v1);
+            // Set model matrix
+            modelMatrix.get(matrixBuffer);
+            shader.setUniformMatrix4fv("u_Model", matrixBuffer);
 
-        // Set color/tint
-        shader.setUniform4f("u_Color", color.x, color.y, color.z, color.w * alpha);
+            // Set texture
+            if (texture != null) {
+                texture.bind(0);
+                shader.setUniform1i("u_Texture", 0);
+            } else {
+                // Use a default texture or handle null texture case
+                // This is handled in the shader
+                if (verboseLogging) {
+                    System.out.println("Using a null texture (solid color sprite)");
+                }
+            }
 
-        // Set view position for lighting calculations
-        Vector3f viewPos = renderSystem.getCamera().getPosition();
-        shader.setUniform3f("u_ViewPos", viewPos.x, viewPos.y, viewPos.z);
+            // Set palette colors
+            shader.setUniform3fv("u_Palette", paletteColors);
 
-        // Draw the sprite
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+            // Set flip flags
+            shader.setUniform1i("u_flipX", flipX ? 1 : 0);
+            shader.setUniform1i("u_flipY", flipY ? 1 : 0);
 
-        // Unbind shader
-        glUseProgram(0);
+            // Set texture coordinates
+            shader.setUniform4f("u_texCoords", u0, v0, u1, v1);
+
+            // Set color/tint
+            shader.setUniform4f("u_Color", color.x, color.y, color.z, color.w * alpha);
+
+            // Set view position for lighting calculations
+            Vector3f viewPos = renderSystem.getCamera().getPosition();
+            shader.setUniform3f("u_ViewPos", viewPos.x, viewPos.y, viewPos.z);
+
+            // Draw the sprite
+            glBindVertexArray(vao);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+            if (verboseLogging) {
+                System.out.println("Draw call executed with VAO: " + vao + ", 6 vertices");
+            }
+
+            glBindVertexArray(0);
+
+            // Unbind shader
+            glUseProgram(0);
+
+            if (verboseLogging) {
+                System.out.println("Sprite rendering complete");
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR in sprite rendering: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -209,21 +329,33 @@ public class Sprite extends Component implements Renderable {
 
     @Override
     public float getZ() {
+        if (getGameObject() == null || getGameObject().getTransform() == null) {
+            return 0; // Default Z if transform is not available
+        }
         return getGameObject().getTransform().getPosition().z;
     }
 
     @Override
     public float getWidth() {
+        if (getGameObject() == null || getGameObject().getTransform() == null) {
+            return width; // Default width if transform is not available
+        }
         return width * getGameObject().getTransform().getScale().x;
     }
 
     @Override
     public float getHeight() {
+        if (getGameObject() == null || getGameObject().getTransform() == null) {
+            return height; // Default height if transform is not available
+        }
         return height * getGameObject().getTransform().getScale().y;
     }
 
     @Override
     public Transform getTransform() {
+        if (getGameObject() == null) {
+            return null;
+        }
         return getGameObject().getTransform();
     }
 
@@ -272,6 +404,10 @@ public class Sprite extends Component implements Renderable {
 
         this.color.set(r, g, b, 1.0f);
         this.alpha = alpha;
+
+        if (verboseLogging) {
+            System.out.println("Set sprite color: RGB(" + r + ", " + g + ", " + b + "), alpha: " + alpha);
+        }
     }
 
     /**
@@ -358,5 +494,9 @@ public class Sprite extends Component implements Renderable {
 
     public Vector4f getColor() {
         return new Vector4f(color);
+    }
+
+    public void setVerboseLogging(boolean verbose) {
+        this.verboseLogging = verbose;
     }
 }

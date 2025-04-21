@@ -20,6 +20,7 @@ public class ShaderManager {
     private static ShaderManager instance;
 
     private final Map<String, Shader> shaders = new HashMap<>();
+    private boolean verboseLogging = true;
 
     /**
      * Singleton instance accessor
@@ -35,7 +36,40 @@ public class ShaderManager {
      * Private constructor for singleton
      */
     private ShaderManager() {
-        // Initialize default shaders
+        if (verboseLogging) {
+            System.out.println("ShaderManager initialized");
+        }
+    }
+
+    /**
+     * Add a shader directly (useful for default shaders)
+     */
+    public void addShader(String name, Shader shader) {
+        if (shader != null) {
+            shaders.put(name, shader);
+            if (verboseLogging) {
+                System.out.println("Added shader '" + name + "' with program ID: " + shader.getProgramId());
+            }
+        }
+    }
+
+    /**
+     * Create a default shader with source code
+     */
+    public Shader createDefaultShader(String name, String vertexShaderSource, String fragmentShaderSource) {
+        if (verboseLogging) {
+            System.out.println("Creating default shader: " + name);
+        }
+
+        try {
+            Shader shader = new Shader(vertexShaderSource, fragmentShaderSource);
+            shaders.put(name, shader);
+            return shader;
+        } catch (Exception e) {
+            System.err.println("Error creating default shader '" + name + "': " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**
@@ -43,20 +77,73 @@ public class ShaderManager {
      */
     public Shader loadShader(String name, String vertexShaderPath, String fragmentShaderPath) {
         if (shaders.containsKey(name)) {
+            if (verboseLogging) {
+                System.out.println("Returning existing shader: " + name);
+            }
             return shaders.get(name);
         }
 
         try {
+            if (verboseLogging) {
+                System.out.println("Loading shader '" + name + "' from:");
+                System.out.println("  Vertex: " + vertexShaderPath);
+                System.out.println("  Fragment: " + fragmentShaderPath);
+            }
+
             String vertexShaderSource = loadShaderSource(vertexShaderPath);
             String fragmentShaderSource = loadShaderSource(fragmentShaderPath);
 
             Shader shader = new Shader(vertexShaderSource, fragmentShaderSource);
+            shader.setShaderPaths(vertexShaderPath, fragmentShaderPath);
             shaders.put(name, shader);
+
+            if (verboseLogging) {
+                System.out.println("Shader '" + name + "' loaded successfully with program ID: " + shader.getProgramId());
+            }
 
             return shader;
         } catch (Exception e) {
             System.err.println("Error loading shader '" + name + "': " + e.getMessage());
+            e.printStackTrace();
 
+            // Create a simple fallback shader
+            return createSimpleFallbackShader(name);
+        }
+    }
+
+    /**
+     * Create a simple fallback shader when loading fails
+     */
+    private Shader createSimpleFallbackShader(String name) {
+        System.out.println("Creating simple fallback shader for: " + name);
+
+        String vertexSource =
+                "#version 330 core\n" +
+                        "layout (location = 0) in vec3 aPos;\n" +
+                        "layout (location = 1) in vec2 aTexCoord;\n" +
+                        "uniform mat4 u_MVP;\n" +
+                        "out vec2 TexCoord;\n" +
+                        "void main() {\n" +
+                        "    gl_Position = u_MVP * vec4(aPos, 1.0);\n" +
+                        "    TexCoord = aTexCoord;\n" +
+                        "}\n";
+
+        String fragmentSource =
+                "#version 330 core\n" +
+                        "in vec2 TexCoord;\n" +
+                        "out vec4 FragColor;\n" +
+                        "uniform vec4 u_Color;\n" +
+                        "void main() {\n" +
+                        "    FragColor = u_Color;\n" +
+                        "}\n";
+
+        try {
+            Shader shader = new Shader(vertexSource, fragmentSource);
+            shaders.put(name, shader);
+            System.out.println("Fallback shader created with program ID: " + shader.getProgramId());
+            return shader;
+        } catch (Exception e) {
+            System.err.println("Failed to create fallback shader: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -66,7 +153,11 @@ public class ShaderManager {
      * Get a shader by name
      */
     public Shader getShader(String name) {
-        return shaders.get(name);
+        Shader shader = shaders.get(name);
+        if (shader == null && verboseLogging) {
+            System.out.println("Shader not found: " + name);
+        }
+        return shader;
     }
 
     /**
@@ -84,6 +175,15 @@ public class ShaderManager {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     source.append(line).append("\n");
+                }
+            }
+
+            if (verboseLogging) {
+                System.out.println("Loaded shader source from: " + resourcePath);
+                if (source.length() > 500) {
+                    System.out.println("Source length: " + source.length() + " characters");
+                } else {
+                    System.out.println("Source: " + source.toString());
                 }
             }
         }
@@ -141,10 +241,17 @@ public class ShaderManager {
         private String vertexShaderPath;
         private String fragmentShaderPath;
 
+        // Added for debugging
+        private boolean verboseLogging = true;
+
         /**
          * Create a shader from source code
          */
         public Shader(String vertexShaderSource, String fragmentShaderSource) {
+            if (verboseLogging) {
+                System.out.println("Creating shader from source code");
+            }
+
             // Compile vertex shader
             int vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
             glShaderSource(vertexShaderId, vertexShaderSource);
@@ -155,6 +262,10 @@ public class ShaderManager {
                 String log = glGetShaderInfoLog(vertexShaderId);
                 glDeleteShader(vertexShaderId);
                 throw new RuntimeException("Vertex shader compilation failed: " + log);
+            }
+
+            if (verboseLogging) {
+                System.out.println("Vertex shader compiled successfully");
             }
 
             // Compile fragment shader
@@ -168,6 +279,10 @@ public class ShaderManager {
                 glDeleteShader(vertexShaderId);
                 glDeleteShader(fragmentShaderId);
                 throw new RuntimeException("Fragment shader compilation failed: " + log);
+            }
+
+            if (verboseLogging) {
+                System.out.println("Fragment shader compiled successfully");
             }
 
             // Link the program
@@ -185,9 +300,19 @@ public class ShaderManager {
                 throw new RuntimeException("Shader program linking failed: " + log);
             }
 
+            if (verboseLogging) {
+                System.out.println("Shader program linked successfully with ID: " + programId);
+            }
+
             // Shaders are linked into the program, so we can delete them
             glDeleteShader(vertexShaderId);
             glDeleteShader(fragmentShaderId);
+
+            // Validate the program
+            glValidateProgram(programId);
+            if (glGetProgrami(programId, GL_VALIDATE_STATUS) == GL_FALSE) {
+                System.err.println("WARNING: Shader validation: " + glGetProgramInfoLog(programId));
+            }
         }
 
         /**
@@ -217,6 +342,9 @@ public class ShaderManager {
          */
         public void use() {
             glUseProgram(programId);
+            if (verboseLogging) {
+                System.out.println("Using shader program: " + programId);
+            }
         }
 
         /**
@@ -243,6 +371,11 @@ public class ShaderManager {
 
             int location = glGetUniformLocation(programId, name);
             uniformLocationCache.put(name, location);
+
+            if (location == -1 && verboseLogging) {
+                System.out.println("WARNING: Uniform '" + name + "' not found in shader " + programId);
+            }
+
             return location;
         }
 

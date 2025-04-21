@@ -31,6 +31,10 @@ public class Camera extends Component {
     private boolean viewMatrixDirty = true;
     private boolean projectionMatrixDirty = true;
 
+    // ADDED: Direct position reference to avoid Transform dependency issues
+    private Vector3f cameraPosition = new Vector3f(0, 0, 0);
+    private float cameraRotation = 0.0f;
+
     /**
      * Create a camera with default settings
      */
@@ -48,9 +52,22 @@ public class Camera extends Component {
     }
 
     @Override
+    protected void onInit() {
+        super.onInit();
+        // ADDED: Initialize camera position from transform if available
+        if (getGameObject() != null && getGameObject().getTransform() != null) {
+            cameraPosition.set(getGameObject().getTransform().getPosition());
+            cameraRotation = getGameObject().getTransform().getRotation();
+        }
+        System.out.println("Camera initialized with position: " + cameraPosition);
+    }
+
+    @Override
     protected void onUpdate(float deltaTime) {
-        // Update viewMatrix if transform has changed
-        if (getTransform().hasPositionChanged() || getTransform().hasRotationChanged()) {
+        // Update position from transform if available
+        if (getGameObject() != null && getGameObject().getTransform() != null) {
+            cameraPosition.set(getGameObject().getTransform().getPosition());
+            cameraRotation = getGameObject().getTransform().getRotation();
             viewMatrixDirty = true;
         }
 
@@ -64,8 +81,6 @@ public class Camera extends Component {
      * Update camera position when following a target
      */
     private void updateFollowing(float deltaTime) {
-        Vector3f currentPos = getTransform().getPosition();
-
         // Calculate target position with screen centering
         float targetX = targetPosition.x - (viewportWidth * zoom) / 2;
         float targetY = targetPosition.y - (viewportHeight * zoom) / 2;
@@ -73,12 +88,20 @@ public class Camera extends Component {
         // Smoothly interpolate towards target position
         float followLerp = Math.min(1.0f, followSpeed * deltaTime * 60.0f); // Normalize by 60 FPS
 
-        float newX = currentPos.x + (targetX - currentPos.x) * followLerp;
-        float newY = currentPos.y + (targetY - currentPos.y) * followLerp;
+        float newX = cameraPosition.x + (targetX - cameraPosition.x) * followLerp;
+        float newY = cameraPosition.y + (targetY - cameraPosition.y) * followLerp;
 
         // Only update if significant movement
-        if (Math.abs(newX - currentPos.x) > 0.01f || Math.abs(newY - currentPos.y) > 0.01f) {
-            getTransform().setPosition(newX, newY, currentPos.z);
+        if (Math.abs(newX - cameraPosition.x) > 0.01f || Math.abs(newY - cameraPosition.y) > 0.01f) {
+            cameraPosition.x = newX;
+            cameraPosition.y = newY;
+
+            // Update transform if available
+            if (getGameObject() != null && getGameObject().getTransform() != null) {
+                getGameObject().getTransform().setPosition(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+            }
+
+            viewMatrixDirty = true;
         }
     }
 
@@ -88,8 +111,9 @@ public class Camera extends Component {
     private void updateViewMatrix() {
         if (!viewMatrixDirty) return;
 
-        Vector3f position = getTransform().getPosition();
-        float rotation = getTransform().getRotation();
+        // FIXED: Use our cached position instead of trying to get it from transform
+        Vector3f position = cameraPosition;
+        float rotation = cameraRotation;
 
         // Build the view matrix
         viewMatrix.identity()
@@ -110,10 +134,11 @@ public class Camera extends Component {
         if (!projectionMatrixDirty) return;
 
         // For 2D games, use orthographic projection
+        // Try changing the coordinate system to have (0,0) at top-left
         projectionMatrix.identity().ortho(
-                0, viewportWidth,
-                viewportHeight, 0,
-                nearPlane, farPlane
+                0, viewportWidth,   // left to right
+                viewportHeight, 0,  // top to bottom (flipped Y)
+                -1, 1               // near/far planes closer to screen
         );
 
         projectionMatrixDirty = false;
@@ -269,31 +294,35 @@ public class Camera extends Component {
      * Check if a point is visible in the camera's view
      */
     public boolean isInView(float x, float y, float radius) {
-        Vector3f cameraPos = getTransform().getPosition();
-
         // Calculate the visible area in world space
         float visibleWidth = viewportWidth * zoom;
         float visibleHeight = viewportHeight * zoom;
 
         // Check if the point is within the visible area (with radius for buffer)
-        return x + radius >= cameraPos.x &&
-                x - radius <= cameraPos.x + visibleWidth &&
-                y + radius >= cameraPos.y &&
-                y - radius <= cameraPos.y + visibleHeight;
+        return x + radius >= cameraPosition.x &&
+                x - radius <= cameraPosition.x + visibleWidth &&
+                y + radius >= cameraPosition.y &&
+                y - radius <= cameraPosition.y + visibleHeight;
     }
 
     /**
      * Get the camera position in world space
      */
     public Vector3f getPosition() {
-        return getTransform().getPosition();
+        return new Vector3f(cameraPosition);
     }
 
     /**
      * Set camera position in world space
      */
     public void setPosition(float x, float y, float z) {
-        getTransform().setPosition(x, y, z);
+        cameraPosition.set(x, y, z);
+
+        // Update transform if available
+        if (getGameObject() != null && getGameObject().getTransform() != null) {
+            getGameObject().getTransform().setPosition(x, y, z);
+        }
+
         viewMatrixDirty = true;
     }
 

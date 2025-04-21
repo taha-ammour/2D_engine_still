@@ -36,21 +36,35 @@ void main()
 {
     // Sample the texture
     vec4 texColor = texture(u_Texture, TexCoord);
-    if (texColor.a < 0.0001)
-    discard;
+
+    // MODIFIED: For null textures (fallback sprites), don't use the texture
+    bool hasTexture = (texColor.a > 0.0001);
 
     // Determine which palette color to use based on the texture's red channel
-    uint i;
-    if(texColor.r >= (0xA0 / 255.0))
-    i = 3u;
-    else if(texColor.r >= (0x70 / 255.0))
-    i = 2u;
-    else if(texColor.r >= (0x40 / 255.0))
-    i = 1u;
-    else
-    i = 0u;
+    // MODIFIED: Add default color path when texture is null
+    vec3 baseColor;
 
-    vec3 baseColor = u_Palette[int(i)];
+    if (hasTexture) {
+        // Use palette system
+        uint i;
+        if(texColor.r >= (0xA0 / 255.0))
+        i = 3u;
+        else if(texColor.r >= (0x70 / 255.0))
+        i = 2u;
+        else if(texColor.r >= (0x40 / 255.0))
+        i = 1u;
+        else
+        i = 0u;
+
+        baseColor = u_Palette[int(i)];
+
+        // If alpha is too low, discard the fragment (for sprites with transparency)
+        if (texColor.a < 0.0001)
+        discard;
+    } else {
+        // For solid color sprites (no texture), use the given color directly
+        baseColor = u_Color.rgb;
+    }
 
     // Start with ambient light only
     vec3 lighting = u_AmbientColor;
@@ -110,6 +124,9 @@ void main()
     // Apply the lighting to the base color
     vec3 finalColor = baseColor * lighting;
 
+    // MODIFIED: For fallback sprites, use u_Color's alpha
+    float alpha = hasTexture ? texColor.a : u_Color.a;
+
     // Output the final color
-    FragColor = vec4(finalColor, texColor.a) * u_Color;
+    FragColor = vec4(finalColor, alpha) * (hasTexture ? u_Color : vec4(1.0));
 }

@@ -45,8 +45,18 @@ public class SpriteManager {
      * Load a sprite sheet texture
      */
     public void loadSpriteSheet(String name, String path) {
-        Texture texture = resourceManager.loadTexture(name, path);
-        spriteSheets.put(name, texture);
+        try {
+            Texture texture = resourceManager.loadTexture(name, path);
+            if (texture != null) {
+                spriteSheets.put(name, texture);
+                System.out.println("Successfully loaded sprite sheet: " + name + " from " + path);
+            } else {
+                System.err.println("Failed to load sprite sheet: " + name + " from " + path);
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading sprite sheet: " + name + " from " + path);
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -57,26 +67,34 @@ public class SpriteManager {
         // Get the sprite sheet
         Texture sheet = spriteSheets.get(sheetName);
         if (sheet == null) {
-            throw new IllegalArgumentException("Sprite sheet not found: " + sheetName);
+            System.err.println("Sprite sheet not found: " + sheetName + " for sprite: " + name);
+            return; // Skip instead of throwing exception
         }
 
-        // Calculate normalized UV coordinates
-        float sheetWidth = sheet.getWidth();
-        float sheetHeight = sheet.getHeight();
+        try {
+            // Calculate normalized UV coordinates
+            float sheetWidth = sheet.getWidth();
+            float sheetHeight = sheet.getHeight();
 
-        float u0 = x / sheetWidth;
-        float v0 = y / sheetHeight;
-        float u1 = (x + width) / sheetWidth;
-        float v1 = (y + height) / sheetHeight;
+            float u0 = x / sheetWidth;
+            float v0 = y / sheetHeight;
+            float u1 = (x + width) / sheetWidth;
+            float v1 = (y + height) / sheetHeight;
 
-        // Create sprite definition
-        SpriteDefinition definition = new SpriteDefinition(
-                id, name, sheet, x, y, width, height, u0, v0, u1, v1, palette
-        );
+            // Create sprite definition
+            SpriteDefinition definition = new SpriteDefinition(
+                    id, name, sheet, x, y, width, height, u0, v0, u1, v1, palette
+            );
 
-        // Store the definition
-        spritesById.put(id, definition);
-        spritesByName.put(name.toLowerCase(), definition);
+            // Store the definition
+            spritesById.put(id, definition);
+            spritesByName.put(name.toLowerCase(), definition);
+
+            System.out.println("Defined sprite: " + name + " with ID: " + id);
+        } catch (Exception e) {
+            System.err.println("Error defining sprite: " + name + " in sheet: " + sheetName);
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -99,44 +117,84 @@ public class SpriteManager {
     public Sprite createSprite(int id) {
         SpriteDefinition def = getSprite(id);
         if (def == null) {
+            System.err.println("No sprite definition found for ID: " + id);
             return null;
         }
 
-        // Create a new sprite with the definition's texture and dimensions
-        Sprite sprite = new Sprite(
-                def.getTexture(), def.getU0(), def.getV0(), def.getU1(), def.getV1(),
-                def.getWidth(), def.getHeight()
-        );
+        try {
+            // Create a new sprite with the definition's texture and dimensions
+            Sprite sprite = new Sprite(
+                    def.getTexture(), def.getU0(), def.getV0(), def.getU1(), def.getV1(),
+                    def.getWidth(), def.getHeight()
+            );
 
-        // Set the palette if available
-        if (def.getPalette() != null) {
-            sprite.setPaletteFromCodes(def.getPalette());
+            // Set the palette if available
+            if (def.getPalette() != null) {
+                sprite.setPaletteFromCodes(def.getPalette());
+            }
+
+            return sprite;
+        } catch (Exception e) {
+            System.err.println("Error creating sprite from definition with ID: " + id);
+            e.printStackTrace();
+            return null;
         }
-
-        return sprite;
     }
 
     /**
      * Create a Sprite component from a sprite definition by name
      */
     public Sprite createSprite(String name) {
-        SpriteDefinition def = getSprite(name);
-        if (def == null) {
+        if (name == null || name.isEmpty()) {
+            System.err.println("Invalid sprite name: null or empty");
             return null;
         }
 
-        // Create a new sprite with the definition's texture and dimensions
-        Sprite sprite = new Sprite(
-                def.getTexture(), def.getU0(), def.getV0(), def.getU1(), def.getV1(),
-                def.getWidth(), def.getHeight()
-        );
-
-        // Set the palette if available
-        if (def.getPalette() != null) {
-            sprite.setPaletteFromCodes(def.getPalette());
+        SpriteDefinition def = getSprite(name);
+        if (def == null) {
+            System.err.println("No sprite definition found for name: " + name);
+            return null;
         }
 
-        return sprite;
+        try {
+            // Create a new sprite with the definition's texture and dimensions
+            Sprite sprite = new Sprite(
+                    def.getTexture(), def.getU0(), def.getV0(), def.getU1(), def.getV1(),
+                    def.getWidth(), def.getHeight()
+            );
+
+            // Set the palette if available
+            if (def.getPalette() != null) {
+                sprite.setPaletteFromCodes(def.getPalette());
+            }
+
+            return sprite;
+        } catch (Exception e) {
+            System.err.println("Error creating sprite from definition with name: " + name);
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Dump all sprite definitions to console for debugging
+     */
+    public void dumpSpriteDefinitions() {
+        System.out.println("=== SPRITE DEFINITIONS ===");
+        System.out.println("Total sprite sheets: " + spriteSheets.size());
+        for (String sheetName : spriteSheets.keySet()) {
+            Texture texture = spriteSheets.get(sheetName);
+            System.out.println("Sheet: " + sheetName + " (" + texture.getWidth() + "x" + texture.getHeight() + ")");
+        }
+
+        System.out.println("Total sprites: " + spritesById.size());
+        for (SpriteDefinition def : spritesById.values()) {
+            System.out.println("Sprite: " + def.getName() + " (ID: " + def.getId() + ") - Size: " +
+                    def.getWidth() + "x" + def.getHeight() + " - UVs: (" +
+                    def.getU0() + "," + def.getV0() + ") to (" +
+                    def.getU1() + "," + def.getV1() + ")");
+        }
+        System.out.println("==========================");
     }
 
     /**

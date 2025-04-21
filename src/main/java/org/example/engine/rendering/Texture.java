@@ -67,7 +67,7 @@ public class Texture {
             IntBuffer channelsBuffer = stack.mallocInt(1);
 
             // Load image
-            STBImage.stbi_set_flip_vertically_on_load(true);
+            //STBImage.stbi_set_flip_vertically_on_load(false);
             ByteBuffer imageData = STBImage.stbi_load(adjustedPath, widthBuffer, heightBuffer, channelsBuffer, 0);
 
             if (imageData == null) {
