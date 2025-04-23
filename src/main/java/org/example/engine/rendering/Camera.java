@@ -13,9 +13,11 @@ public class Camera extends Component {
     // Camera properties
     private float viewportWidth = 800;
     private float viewportHeight = 600;
+    private float originalAspectRatio = 800f / 600f; // Store original aspect ratio
     private float zoom = 1.0f;
     private float nearPlane = 0.1f;
     private float farPlane = 1000.0f;
+    private boolean maintainAspectRatio = true; // Flag to enable/disable aspect ratio preservation
 
     // Follow target
     private boolean followingTarget = false;
@@ -31,14 +33,21 @@ public class Camera extends Component {
     private boolean viewMatrixDirty = true;
     private boolean projectionMatrixDirty = true;
 
-    // ADDED: Direct position reference to avoid Transform dependency issues
+    // Direct position reference to avoid Transform dependency issues
     private Vector3f cameraPosition = new Vector3f(0, 0, 0);
     private float cameraRotation = 0.0f;
+
+    // Virtual viewport coordinates (for letterboxing/pillarboxing)
+    private float virtualViewportX = 0;
+    private float virtualViewportY = 0;
+    private float virtualViewportWidth = 800;
+    private float virtualViewportHeight = 600;
 
     /**
      * Create a camera with default settings
      */
     public Camera() {
+        this.originalAspectRatio = viewportWidth / viewportHeight;
         updateProjectionMatrix();
     }
 
@@ -48,13 +57,16 @@ public class Camera extends Component {
     public Camera(float width, float height) {
         this.viewportWidth = width;
         this.viewportHeight = height;
+        this.originalAspectRatio = width / height;
+        this.virtualViewportWidth = width;
+        this.virtualViewportHeight = height;
         updateProjectionMatrix();
     }
 
     @Override
     protected void onInit() {
         super.onInit();
-        // ADDED: Initialize camera position from transform if available
+        // Initialize camera position from transform if available
         if (getGameObject() != null && getGameObject().getTransform() != null) {
             cameraPosition.set(getGameObject().getTransform().getPosition());
             cameraRotation = getGameObject().getTransform().getRotation();
@@ -82,8 +94,8 @@ public class Camera extends Component {
      */
     private void updateFollowing(float deltaTime) {
         // Calculate target position with screen centering
-        float targetX = targetPosition.x - (viewportWidth * zoom) / 2;
-        float targetY = targetPosition.y - (viewportHeight * zoom) / 2;
+        float targetX = targetPosition.x - (virtualViewportWidth * zoom) / 2;
+        float targetY = targetPosition.y - (virtualViewportHeight * zoom) / 2;
 
         // Smoothly interpolate towards target position
         float followLerp = Math.min(1.0f, followSpeed * deltaTime * 60.0f); // Normalize by 60 FPS
@@ -111,7 +123,7 @@ public class Camera extends Component {
     private void updateViewMatrix() {
         if (!viewMatrixDirty) return;
 
-        // FIXED: Use our cached position instead of trying to get it from transform
+        // Use our cached position instead of trying to get it from transform
         Vector3f position = cameraPosition;
         float rotation = cameraRotation;
 
@@ -133,13 +145,44 @@ public class Camera extends Component {
     private void updateProjectionMatrix() {
         if (!projectionMatrixDirty) return;
 
-        // For 2D games, use orthographic projection
-        // Try changing the coordinate system to have (0,0) at top-left
-        projectionMatrix.identity().ortho(
-                0, viewportWidth,   // left to right
-                viewportHeight, 0,  // top to bottom (flipped Y)
-                -1, 1               // near/far planes closer to screen
-        );
+        if (maintainAspectRatio) {
+            // Calculate the virtual viewport to maintain aspect ratio
+            float currentAspectRatio = viewportWidth / viewportHeight;
+
+            if (currentAspectRatio > originalAspectRatio) {
+                // Window is wider than original - add pillarboxing
+                virtualViewportWidth = viewportHeight * originalAspectRatio;
+                virtualViewportHeight = viewportHeight;
+                virtualViewportX = (viewportWidth - virtualViewportWidth) / 2f;
+                virtualViewportY = 0;
+            } else {
+                // Window is taller than original - add letterboxing
+                virtualViewportWidth = viewportWidth;
+                virtualViewportHeight = viewportWidth / originalAspectRatio;
+                virtualViewportX = 0;
+                virtualViewportY = (viewportHeight - virtualViewportHeight) / 2f;
+            }
+
+            // Create orthographic projection for the virtual viewport
+            projectionMatrix.identity().ortho(
+                    virtualViewportX, virtualViewportX + virtualViewportWidth,
+                    virtualViewportY + virtualViewportHeight, virtualViewportY,
+                    -1, 1
+            );
+        } else {
+            // Original behavior - directly use viewport dimensions
+            projectionMatrix.identity().ortho(
+                    0, viewportWidth,
+                    viewportHeight, 0,
+                    -1, 1
+            );
+
+            // Reset virtual viewport to match actual viewport
+            virtualViewportX = 0;
+            virtualViewportY = 0;
+            virtualViewportWidth = viewportWidth;
+            virtualViewportHeight = viewportHeight;
+        }
 
         projectionMatrixDirty = false;
     }
@@ -182,6 +225,12 @@ public class Camera extends Component {
     public Vector2f screenToWorld(float screenX, float screenY) {
         updateViewMatrix();
 
+        // Adjust for virtual viewport if maintaining aspect ratio
+        if (maintainAspectRatio) {
+            screenX = (screenX - virtualViewportX) * (viewportWidth / virtualViewportWidth);
+            screenY = (screenY - virtualViewportY) * (viewportHeight / virtualViewportHeight);
+        }
+
         // Convert screen coordinates to normalized device coordinates
         float ndcX = (2.0f * screenX) / viewportWidth - 1.0f;
         float ndcY = 1.0f - (2.0f * screenY) / viewportHeight;
@@ -217,6 +266,12 @@ public class Camera extends Component {
         // Convert NDC to screen space
         float screenX = (ndcPoint.x + 1.0f) * 0.5f * viewportWidth;
         float screenY = (1.0f - ndcPoint.y) * 0.5f * viewportHeight;
+
+        // Adjust for virtual viewport if maintaining aspect ratio
+        if (maintainAspectRatio) {
+            screenX = virtualViewportX + screenX * (virtualViewportWidth / viewportWidth);
+            screenY = virtualViewportY + screenY * (virtualViewportHeight / viewportHeight);
+        }
 
         return new Vector2f(screenX, screenY);
     }
@@ -269,6 +324,43 @@ public class Camera extends Component {
     }
 
     /**
+     * Enable or disable aspect ratio preservation
+     */
+    public void setMaintainAspectRatio(boolean maintain) {
+        if (this.maintainAspectRatio != maintain) {
+            this.maintainAspectRatio = maintain;
+            projectionMatrixDirty = true;
+        }
+    }
+
+    /**
+     * Set the original aspect ratio to be maintained
+     */
+    public void setOriginalAspectRatio(float aspectRatio) {
+        this.originalAspectRatio = aspectRatio;
+        projectionMatrixDirty = true;
+    }
+
+    /**
+     * Get the current virtual viewport dimensions
+     */
+    public float getVirtualViewportWidth() {
+        return virtualViewportWidth;
+    }
+
+    public float getVirtualViewportHeight() {
+        return virtualViewportHeight;
+    }
+
+    public float getVirtualViewportX() {
+        return virtualViewportX;
+    }
+
+    public float getVirtualViewportY() {
+        return virtualViewportY;
+    }
+
+    /**
      * Set camera zoom level
      * @param zoom Zoom factor (1.0 = normal, < 1.0 = zoom out, > 1.0 = zoom in)
      */
@@ -295,8 +387,8 @@ public class Camera extends Component {
      */
     public boolean isInView(float x, float y, float radius) {
         // Calculate the visible area in world space
-        float visibleWidth = viewportWidth * zoom;
-        float visibleHeight = viewportHeight * zoom;
+        float visibleWidth = virtualViewportWidth * zoom;
+        float visibleHeight = virtualViewportHeight * zoom;
 
         // Check if the point is within the visible area (with radius for buffer)
         return x + radius >= cameraPosition.x &&
@@ -338,5 +430,10 @@ public class Camera extends Component {
      */
     public float getViewportHeight() {
         return viewportHeight;
+    }
+
+
+    public boolean getMaintainAspectRatio() {
+        return maintainAspectRatio;
     }
 }

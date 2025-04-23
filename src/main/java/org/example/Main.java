@@ -4,6 +4,7 @@ import org.example.engine.Engine;
 import org.example.engine.EntityRegistry;
 import org.example.engine.SpriteManager;
 import org.example.engine.core.GameObject;
+import org.example.engine.physics.BoxCollider;
 import org.example.engine.physics.PhysicsSystem;
 import org.example.engine.rendering.Camera;
 import org.example.engine.rendering.Light;
@@ -80,9 +81,16 @@ public class Main {
         try {
             // Now create sprite and add to initialized GameObject
             Sprite playerSprite = spriteManager.createSprite("player_sprite_d");
+
             System.out.println("player sprite created: " + playerSprite);
+
             if (playerSprite != null) {
+                player.setScale(12,12,0);
                 player.addComponent(playerSprite);
+                BoxCollider box = new BoxCollider(player.getScale().x, player.getScale().y);
+                box = player.addComponent(box);
+                camera.follow(player.getTransform().getPosition());
+                System.out.println("gehiue-0pfa" + box.getTransform().getPosition());
                 System.out.println("Player sprite added successfully");
             } else {
                 System.err.println("ERROR: Failed to create sprite - returned null");

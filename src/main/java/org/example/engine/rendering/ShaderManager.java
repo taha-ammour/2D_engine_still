@@ -20,7 +20,7 @@ public class ShaderManager {
     private static ShaderManager instance;
 
     private final Map<String, Shader> shaders = new HashMap<>();
-    private boolean verboseLogging = true;
+    private boolean verboseLogging = false;
 
     /**
      * Singleton instance accessor
@@ -242,7 +242,7 @@ public class ShaderManager {
         private String fragmentShaderPath;
 
         // Added for debugging
-        private boolean verboseLogging = true;
+        private boolean verboseLogging = false;
 
         /**
          * Create a shader from source code
@@ -372,7 +372,8 @@ public class ShaderManager {
             int location = glGetUniformLocation(programId, name);
             uniformLocationCache.put(name, location);
 
-            if (location == -1 && verboseLogging) {
+            if (location == -1 && verboseLogging &&
+                    !name.startsWith("u_") && !name.startsWith("lights[")) {
                 System.out.println("WARNING: Uniform '" + name + "' not found in shader " + programId);
             }
 

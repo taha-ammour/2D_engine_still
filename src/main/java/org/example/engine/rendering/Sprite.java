@@ -50,13 +50,15 @@ public class Sprite extends Component implements Renderable {
     private Vector4f color = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     // Debug flags
-    private boolean verboseLogging = true;
+    private boolean verboseLogging = false;
 
     /**
      * Create a sprite with the given texture and dimensions
      */
     public Sprite(Texture texture, float width, float height) {
         this(texture, 0, 0, 1, 1, width, height);
+
+        this.setTransparent(true);
     }
 
     /**
@@ -109,35 +111,121 @@ public class Sprite extends Component implements Renderable {
      */
     private ShaderManager.Shader createDefaultShader() {
         try {
+            // VERTEX SHADER
             String vertexSource =
                     "#version 330 core\n" +
                             "layout (location = 0) in vec3 aPos;\n" +
                             "layout (location = 1) in vec2 aTexCoord;\n" +
-                            "uniform mat4 u_MVP;\n" +
+                            "layout (location = 2) in vec3 aNormal;\n" +
+                            "\n" +
                             "out vec2 TexCoord;\n" +
+                            "out vec3 FragPos;\n" +
+                            "out vec3 Normal;\n" +
+                            "\n" +
+                            "uniform mat4 u_MVP;\n" +
+                            "uniform mat4 u_Model = mat4(1.0);\n" +
+                            "\n" +
                             "void main() {\n" +
                             "    gl_Position = u_MVP * vec4(aPos, 1.0);\n" +
                             "    TexCoord = aTexCoord;\n" +
+                            "    FragPos = vec3(u_Model * vec4(aPos, 1.0));\n" +
+                            "    Normal = mat3(transpose(inverse(u_Model))) * aNormal;\n" +
                             "}\n";
 
+            // FRAGMENT SHADER - SIMPLIFIED VERSION
             String fragmentSource =
                     "#version 330 core\n" +
                             "in vec2 TexCoord;\n" +
+                            "in vec3 FragPos;\n" +
+                            "in vec3 Normal;\n" +
+                            "\n" +
                             "out vec4 FragColor;\n" +
-                            "uniform vec4 u_Color;\n" +
+                            "\n" +
+                            "// Basic uniforms that all shaders should have\n" +
                             "uniform sampler2D u_Texture;\n" +
+                            "uniform vec4 u_Color = vec4(1.0, 1.0, 1.0, 1.0);\n" +
+                            "uniform bool u_hasTexture = false;\n" +
+                            "uniform int u_flipX = 0;\n" +
+                            "uniform int u_flipY = 0;\n" +
+                            "uniform vec4 u_texCoords = vec4(0.0, 0.0, 1.0, 1.0);\n" +
+                            "\n" +
+                            "// Light-related uniforms with defaults\n" +
+                            "uniform vec3 u_AmbientColor = vec3(0.3, 0.3, 0.3);\n" +
+                            "uniform vec3 u_Specular = vec3(0.5, 0.5, 0.5);\n" +
+                            "uniform float u_Shininess = 32.0;\n" +
+                            "uniform vec3 u_ViewPos = vec3(0.0, 0.0, 10.0);\n" +
+                            "uniform int lightCount = 0;\n" +
+                            "\n" +
+                            "// Palette for color mapping\n" +
+                            "uniform vec3 u_Palette[4] = vec3[4](\n" +
+                            "    vec3(0.0, 0.0, 0.0),\n" +
+                            "    vec3(0.33, 0.33, 0.33),\n" +
+                            "    vec3(0.67, 0.67, 0.67),\n" +
+                            "    vec3(1.0, 1.0, 1.0)\n" +
+                            ");\n" +
+                            "\n" +
                             "void main() {\n" +
-                            "    vec4 texColor = texture(u_Texture, TexCoord);\n" +
-                            "    if (texColor.a < 0.01) {\n" +
-                            "        FragColor = u_Color;\n" +
-                            "    } else {\n" +
-                            "        FragColor = texColor * u_Color;\n" +
+                            "    // Calculate texture coordinates with flipping support\n" +
+                            "    vec2 texCoords = TexCoord;\n" +
+                            "    \n" +
+                            "    // Adjust UVs based on texture coordinates uniform\n" +
+                            "    texCoords.x = mix(u_texCoords.x, u_texCoords.z, texCoords.x);\n" +
+                            "    texCoords.y = mix(u_texCoords.y, u_texCoords.w, texCoords.y);\n" +
+                            "    \n" +
+                            "    // Apply flipping if needed\n" +
+                            "    if (u_flipX > 0) {\n" +
+                            "        texCoords.x = u_texCoords.z - (texCoords.x - u_texCoords.x);\n" +
                             "    }\n" +
+                            "    if (u_flipY > 0) {\n" +
+                            "        texCoords.y = u_texCoords.w - (texCoords.y - u_texCoords.y);\n" +
+                            "    }\n" +
+                            "    \n" +
+                            "    // Sample the texture with the adjusted coordinates\n" +
+                            "    vec4 texColor = texture(u_Texture, texCoords);\n" +
+                            "    \n" +
+                            "    // Early discard for transparent pixels\n" +
+                            "    if (u_hasTexture && texColor.a < 0.01) {\n" +
+                            "        discard;\n" +
+                            "    }\n" +
+                            "    \n" +
+                            "    // Determine if we have a valid texture\n" +
+                            "    bool hasTexture = u_hasTexture && texColor.a > 0.01;\n" +
+                            "    \n" +
+                            "    // Determine base color (palette or solid color)\n" +
+                            "    vec3 baseColor;\n" +
+                            "    \n" +
+                            "    if (hasTexture) {\n" +
+                            "        // Use palette system for textured sprites\n" +
+                            "        int i = 0;\n" +
+                            "        if(texColor.r >= (0xA0 / 255.0))\n" +
+                            "            i = 3;\n" +
+                            "        else if(texColor.r >= (0x70 / 255.0))\n" +
+                            "            i = 2;\n" +
+                            "        else if(texColor.r >= (0x40 / 255.0))\n" +
+                            "            i = 1;\n" +
+                            "        \n" +
+                            "        baseColor = u_Palette[i];\n" +
+                            "    } else {\n" +
+                            "        // For solid color sprites, use the given color directly\n" +
+                            "        baseColor = u_Color.rgb;\n" +
+                            "    }\n" +
+                            "    \n" +
+                            "    // Final lighting is just ambient for the simplified shader\n" +
+                            "    vec3 lighting = u_AmbientColor;\n" +
+                            "    \n" +
+                            "    // Apply lighting\n" +
+                            "    vec3 finalColor = baseColor * lighting;\n" +
+                            "    \n" +
+                            "    // Calculate final alpha\n" +
+                            "    float alpha = hasTexture ? texColor.a * u_Color.a : u_Color.a;\n" +
+                            "    \n" +
+                            "    // Output final color\n" +
+                            "    FragColor = vec4(finalColor * u_Color.rgb, alpha);\n" +
                             "}\n";
 
             ShaderManager.Shader shader = new ShaderManager.Shader(vertexSource, fragmentSource);
             ShaderManager.getInstance().addShader("sprite", shader);
-            System.out.println("Created default sprite shader");
+            System.out.println("Created simplified sprite shader with fixed uniform types");
             return shader;
         } catch (Exception e) {
             System.err.println("ERROR: Failed to create default shader: " + e.getMessage());
@@ -234,7 +322,6 @@ public class Sprite extends Component implements Renderable {
                         (getGameObject() != null ? getGameObject().getName() : "null"));
                 return;
             }
-
             // Log transform data for debugging
             if (verboseLogging) {
                 Vector3f position = transform.getPosition();
@@ -286,6 +373,8 @@ public class Sprite extends Component implements Renderable {
             // Set flip flags
             shader.setUniform1i("u_flipX", flipX ? 1 : 0);
             shader.setUniform1i("u_flipY", flipY ? 1 : 0);
+            shader.setUniform1i("u_hasTexture", texture != null ? 1 : 0);
+
 
             // Set texture coordinates
             shader.setUniform4f("u_texCoords", u0, v0, u1, v1);

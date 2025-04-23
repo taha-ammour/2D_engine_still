@@ -8,6 +8,7 @@ import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.example.engine.core.Component;
 import org.example.engine.rendering.ShaderManager.Shader;
+import org.lwjgl.opengl.GL11;
 
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ public class RenderSystem {
     private boolean debugMode = false;
 
     // Added for debugging
-    private boolean verboseLogging = true;
+    private boolean verboseLogging = false;
 
     /**
      * Get the singleton instance
@@ -163,6 +164,71 @@ public class RenderSystem {
             }
         }
         this.camera = camera;
+    }
+
+
+    private void configureViewport() {
+        if (camera == null) {
+            // No camera to configure viewport with
+            return;
+        }
+
+        try {
+            // Get viewport dimensions from camera
+            float viewportWidth = camera.getViewportWidth();
+            float viewportHeight = camera.getViewportHeight();
+
+            // Check if aspect ratio maintenance is enabled
+            if (camera.getMaintainAspectRatio()) {
+                // Use virtual viewport dimensions
+                int x = (int)camera.getVirtualViewportX();
+                int y = (int)camera.getVirtualViewportY();
+                int width = (int)camera.getVirtualViewportWidth();
+                int height = (int)camera.getVirtualViewportHeight();
+
+                // Set OpenGL viewport to match virtual viewport
+                GL11.glViewport(x, y, width, height);
+
+                // Clear the letterbox/pillarbox areas
+                if (x > 0 || y > 0) {
+                    // Save current clear color
+                    float[] currentColor = new float[4];
+                    GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, currentColor);
+
+                    // Set clear color to black for letterbox/pillarbox
+                    GL11.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+                    // Clear the areas outside the viewport
+                    if (x > 0) { // Pillarboxing (vertical bars)
+                        GL11.glViewport(0, 0, x, (int)viewportHeight);
+                        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+
+                        GL11.glViewport(x + width, 0, x, (int)viewportHeight);
+                        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+                    }
+
+                    if (y > 0) { // Letterboxing (horizontal bars)
+                        GL11.glViewport(0, 0, (int)viewportWidth, y);
+                        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+
+                        GL11.glViewport(0, y + height, (int)viewportWidth, y);
+                        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+                    }
+
+                    // Reset viewport to the virtual viewport
+                    GL11.glViewport(x, y, width, height);
+
+                    // Restore original clear color
+                    GL11.glClearColor(currentColor[0], currentColor[1], currentColor[2], currentColor[3]);
+                }
+            } else {
+                // Use full viewport area
+                GL11.glViewport(0, 0, (int)viewportWidth, (int)viewportHeight);
+            }
+        } catch (Exception e) {
+            System.err.println("Error configuring viewport: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -279,6 +345,7 @@ public class RenderSystem {
         // Reset statistics for this frame
         drawCalls = 0;
         objectsRendered = 0;
+        configureViewport();
 
         if (verboseLogging) {
             System.out.println("=== RENDER FRAME START ===");

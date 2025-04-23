@@ -19,7 +19,7 @@ public class TestMain {
 
     public static void main(String[] args) {
         // Enable verbose logging to diagnose issues
-        boolean verboseLogging = true;
+        boolean verboseLogging = false;
 
         // Initialize engine
         System.out.println("=== ENGINE INITIALIZATION ===");

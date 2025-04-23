@@ -4,6 +4,7 @@ import org.example.engine.audio.AudioSystem;
 import org.example.engine.core.GameObject;
 import org.example.engine.input.InputSystem;
 import org.example.engine.physics.PhysicsSystem;
+import org.example.engine.rendering.Camera;
 import org.example.engine.rendering.RenderSystem;
 import org.example.engine.scene.SceneManager;
 import org.example.engine.ui.UISystem;
@@ -158,17 +159,23 @@ public class Engine {
      */
     private void onResize(int width, int height) {
         // Update viewport
+        windowWidth = width;
+        windowHeight = height;
+
         GL11.glViewport(0, 0, width, height);
 
         // Update camera
         if (sceneManager.getActiveScene() != null &&
                 sceneManager.getActiveScene().getMainCamera() != null) {
-            sceneManager.getActiveScene().getMainCamera().setViewportSize(width, height);
+            Camera camera = sceneManager.getActiveScene().getMainCamera();
+
+            // Update camera viewport size
+            camera.setViewportSize(width, height);
+
+            // Make sure aspect ratio preservation is enabled (default is already true in the updated Camera class)
+            camera.setMaintainAspectRatio(true);
         }
 
-        // Update window size
-        windowWidth = width;
-        windowHeight = height;
     }
 
     /**

@@ -31,6 +31,8 @@ uniform vec3 u_AmbientColor;
 uniform vec3 u_Specular;
 uniform float u_Shininess;
 uniform vec3 u_ViewPos;
+uniform bool u_hasTexture = false;
+
 
 void main()
 {
@@ -38,7 +40,8 @@ void main()
     vec4 texColor = texture(u_Texture, TexCoord);
 
     // MODIFIED: For null textures (fallback sprites), don't use the texture
-    bool hasTexture = (texColor.a > 0.0001);
+    bool hasTexture = u_hasTexture && texture(u_Texture, vec2(0.5, 0.5)).a > 0.0001;
+
 
     // Determine which palette color to use based on the texture's red channel
     // MODIFIED: Add default color path when texture is null
@@ -59,7 +62,7 @@ void main()
         baseColor = u_Palette[int(i)];
 
         // If alpha is too low, discard the fragment (for sprites with transparency)
-        if (texColor.a < 0.0001)
+        if (hasTexture && texColor.a < 0.0001)
         discard;
     } else {
         // For solid color sprites (no texture), use the given color directly

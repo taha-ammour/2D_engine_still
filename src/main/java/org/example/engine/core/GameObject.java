@@ -304,6 +304,10 @@ public class GameObject implements EventListener {
         transform.setScale(x, y, z);
     }
 
+    public Vector3f getScale(){
+        return transform.getScale();
+    }
+
     /**
      * Set rotation (in radians)
      */
