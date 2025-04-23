@@ -71,6 +71,8 @@ public class GameObject implements EventListener {
         for (Component component : componentList) {
             if (component.isActive()) {
                 component.onUpdate(deltaTime);
+                component.onUpdate(deltaTime);
+                component.onUpdate(deltaTime);
             }
         }
 
