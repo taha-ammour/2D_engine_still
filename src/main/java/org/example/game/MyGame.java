@@ -13,6 +13,8 @@ import org.example.engine.rendering.Sprite;
 import org.example.engine.resource.ResourceManager;
 import org.example.engine.scene.Scene;
 import org.example.engine.scene.SceneManager;
+import org.example.game.map.FloorDecorator;
+import org.example.game.map.RoomGenerator;
 import org.joml.Vector3f;
 
 import java.io.File;
@@ -20,6 +22,11 @@ import java.io.File;
 public class MyGame {
     private Engine engine;
     private Scene gameScene;
+
+    private static final int ROOM_WIDTH = 150;  // In tiles
+    private static final int ROOM_HEIGHT = 100; // In tiles
+    private static final float ROOM_START_X = 100;
+    private static final float ROOM_START_Y = 100;
 
     private void registerSprites() {
         // Get sprite manager
@@ -89,13 +96,15 @@ public class MyGame {
         // Create scene
         gameScene = engine.getSceneManager().createScene("GameScene");
         gameScene.setAmbientLight(0.8f, 0.8f, 0.8f);
+        engine.getSceneManager().loadScene("GameScene");
 
         // Set up camera
         createCamera();
 
-        engine.getSceneManager().loadScene("GameScene");
         //loadSoundResources();
         registerSprites();
+
+        createRoom();
 
         // Create player
         createPlayer();
@@ -108,26 +117,74 @@ public class MyGame {
 
         createStars();
 
+        createUI();
+
+
 
         engine.setClearColor(0.2f, 0.2f, 0.3f);
         // Load scene
         engine.getSceneManager().loadScene("GameScene");
     }
 
+    private void createRoom() {
+        SpriteManager spriteManager = SpriteManager.getInstance();
+
+        // Create and use the room generator
+        RoomGenerator roomGenerator = new RoomGenerator(
+                gameScene,
+                spriteManager,
+                ROOM_WIDTH,
+                ROOM_HEIGHT,
+                ROOM_START_X,
+                ROOM_START_Y
+        );
+
+        roomGenerator.generateRoom();
+
+        FloorDecorator floorDecorator = new FloorDecorator(
+                gameScene,
+                spriteManager,
+                ROOM_START_X,
+                ROOM_START_Y,
+                ROOM_WIDTH,
+                ROOM_HEIGHT
+        );
+
+        floorDecorator.decorateFloor();
+
+    }
+
     private void createCamera() {
+        // Create camera GameObject
         GameObject cameraObj = new GameObject("MainCamera");
+        cameraObj.setPosition(400, 300, 0);
+
+        // Add camera component
         Camera camera = new Camera(800, 600);
         cameraObj.addComponent(camera);
-        cameraObj.setPosition(400, 300, 10);
+
+        // Add to scene and set as main camera
         gameScene.addGameObject(cameraObj);
         gameScene.setMainCamera(camera);
+
+        // Add our new camera follow component
+        CameraFollow cameraFollow = new CameraFollow();
+        cameraFollow.setTargetTag("Player"); // Follow GameObject with "Player" tag
+        cameraFollow.setFollowSpeed(5.0f);   // Adjust speed as needed
+        // You can set offset if you want camera to be shifted relative to player
+         cameraFollow.setOffset(-camera.getVirtualViewportWidth()/2, -camera.getViewportHeight()/2); // Example: Camera 100 pixels above player
+        cameraObj.addComponent(cameraFollow);
     }
 
 
     private void createPlayer() {
         GameObject player = new GameObject("Player");
         player.setTag("Player");
-        player.setPosition(400, 300, 0);
+
+        float roomCenterX = ROOM_START_X + (ROOM_WIDTH * 16 / 2);
+        float roomCenterY = ROOM_START_Y + (ROOM_HEIGHT * 16 / 2);
+
+        player.setPosition(roomCenterX, roomCenterY, 0);
 
         // Add sprite
         SpriteManager spriteManager = SpriteManager.getInstance();
@@ -140,7 +197,8 @@ public class MyGame {
         Rigidbody rb = new Rigidbody();
         player.addComponent(rb);
 
-        BoxCollider collider = new BoxCollider(playerSprite.getWidth(), playerSprite.getHeight());
+        BoxCollider collider = new BoxCollider(playerSprite.getWidth()-8, playerSprite.getHeight());
+        collider.setOffset(8,0);
         player.addComponent(collider);
 
         // Add player controller
@@ -152,32 +210,52 @@ public class MyGame {
         PlayerWeapon weapon = new PlayerWeapon();
         player.addComponent(weapon);
 
+        PlayerStats stats = new PlayerStats();
+        player.addComponent(stats);
+
         // Add health
         PlayerHealth health = new PlayerHealth(100);
         player.addComponent(health);
 
         gameScene.addGameObject(player);
 
-        // Set camera to follow player
-        Camera camera = gameScene.getMainCamera();
-        if (camera != null) {
-            camera.follow(player.getTransform().getPosition());
-            camera.setFollowSpeed(1.1f);
-        }
+
+    }
+
+    private void createUI() {
+        // Create a UI container object
+        GameObject uiContainer = new GameObject("UI_Container");
+        uiContainer.setTag("UI"); // Tag for finding it later
+        uiContainer.setPosition(0, 0, 10); // High Z to render on top
+
+        // Add UI component
+        GameUI gameUI = new GameUI();
+        uiContainer.addComponent(gameUI);
+
+        // Add to scene
+        gameScene.addGameObject(uiContainer);
+
+        System.out.println("Game UI created");
     }
 
     private void createEnemies() {
+
+        float roomStartX = ROOM_START_X + 32; // Keep away from walls
+        float roomStartY = ROOM_START_Y + 32;
+        float roomEndX = ROOM_START_X + ((ROOM_WIDTH-2) * 16);
+        float roomEndY = ROOM_START_Y + ((ROOM_HEIGHT-2) * 16);
+
         // Create some patrol points
         Vector3f[] patrolPoints1 = {
-                new Vector3f(200, 200, 0),
-                new Vector3f(600, 200, 0),
-                new Vector3f(600, 400, 0),
-                new Vector3f(200, 400, 0)
+                new Vector3f(roomStartX + 50, roomStartY + 50, 0),
+                new Vector3f(roomEndX - 50, roomStartY + 50, 0),
+                new Vector3f(roomEndX - 50, roomEndY - 50, 0),
+                new Vector3f(roomStartX + 50, roomEndY - 50, 0)
         };
 
         // Create first enemy
         GameObject enemy1 = new GameObject("Enemy1");
-        enemy1.setPosition(200, 200, 0);
+        enemy1.setPosition(roomStartX + 50, roomStartY + 50, 0);
 
         Sprite enemySprite = new Sprite(null, 16, 16);
         enemySprite.setColor(0xFF0000, 1.0f);
@@ -191,27 +269,97 @@ public class MyGame {
 
         gameScene.addGameObject(enemy1);
 
-        // Create more enemies as needed...
     }
 
     private void createCollectibles() {
-        // Create several collectibles around the level
-        for (int i = 0; i < 10; i++) {
-            float x = 100 + (i * 70);
-            float y = 250 + (float)(Math.sin(i * 0.5) * 100);
+        float roomStartX = ROOM_START_X + 32; // Keep away from walls
+        float roomStartY = ROOM_START_Y + 32;
+        float roomWidth = (ROOM_WIDTH - 2) * 16;
+        float roomHeight = (ROOM_HEIGHT - 2) * 16;
 
-            GameObject collectible = new GameObject("Collectible" + i);
+        // Get sprite manager
+        SpriteManager spriteManager = SpriteManager.getInstance();
+
+        // Create several emerald collectibles around the room
+        for (int i = 0; i < 8; i++) {
+            // Calculate position within room bounds
+            float x = roomStartX + (float)(Math.random() * roomWidth);
+            float y = roomStartY + (float)(Math.random() * roomHeight);
+
+            GameObject collectible = new GameObject("Emerald" + i);
             collectible.setPosition(x, y, 0);
 
-            Sprite collectibleSprite = new Sprite(null, 16, 16);
-            collectibleSprite.setColor(0xFFFF00, 1.0f); // Yellow color
-            collectible.addComponent(collectibleSprite);
+            // Use just the first emerald sprite initially - animation will change it
+            Sprite collectibleSprite = spriteManager.createSprite("Emerald_id_1");
+            Sprite collectibleSprite1 = spriteManager.createSprite("Emerald_id_2");
+            Sprite collectibleSprite2 = spriteManager.createSprite("Emerald_id_3");
 
-            Collectible behavior = new Collectible();
-            collectible.addComponent(behavior);
+            if (collectibleSprite != null) {
+                collectible.addComponent(collectibleSprite);
+                collectible.addComponent(collectibleSprite1);
+                collectible.addComponent(collectibleSprite2);
 
-            gameScene.addGameObject(collectible);
+                // FIRST add to scene - IMPORTANT: do this before adding the animator component
+                gameScene.addGameObject(collectible);
+
+                // NOW add animated collectible behavior (emerald type)
+                AnimatedCollectible behavior = new AnimatedCollectible(true);
+                collectible.addComponent(behavior);
+            } else {
+                System.err.println("Failed to load emerald sprite");
+            }
         }
+
+        // Create a few chest collectibles
+        for (int i = 0; i < 3; i++) {
+            // Calculate position within room bounds
+            float x = roomStartX + (float)(Math.random() * roomWidth);
+            float y = roomStartY + (float)(Math.random() * roomHeight);
+
+            GameObject chest = new GameObject("SmallChest" + i);
+            chest.setPosition(x, y, 0);
+
+            // Use just the first chest sprite initially - animation will change it
+            Sprite chestSprite = spriteManager.createSprite("ChestE_id_1");
+
+            if (chestSprite != null) {
+                chest.addComponent(chestSprite);
+
+                // FIRST add to scene
+                gameScene.addGameObject(chest);
+
+                // THEN add animated collectible behavior
+                AnimatedCollectible behavior = new AnimatedCollectible(false);
+                chest.addComponent(behavior);
+            } else {
+                System.err.println("Failed to load chest sprite");
+            }
+        }
+
+        // Create a special treasure chest near the center of the room
+        float roomCenterX = roomStartX + (roomWidth / 2) + 50; // Offset a bit from center
+        float roomCenterY = roomStartY + (roomHeight / 2) + 30;
+
+        GameObject treasure = new GameObject("TreasureChest");
+        treasure.setPosition(roomCenterX, roomCenterY, 0);
+
+        Sprite treasureSprite = spriteManager.createSprite("ChestH_id_1");
+        if (treasureSprite != null) {
+            treasure.addComponent(treasureSprite);
+
+            // Scale the treasure chest
+            treasure.setScale(2.5f, 2.5f, 1.0f);
+
+            // FIRST add to scene
+            gameScene.addGameObject(treasure);
+
+            // THEN add animated collectible behavior
+            AnimatedCollectible behavior = new AnimatedCollectible(false);
+            treasure.addComponent(behavior);
+        } else {
+            System.err.println("Failed to load treasure chest sprite");
+        }
+
     }
 
     private void createStars(){

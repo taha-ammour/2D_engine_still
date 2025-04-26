@@ -175,7 +175,7 @@ public class Camera extends Component {
             projectionMatrix.identity().ortho(
                     0, virtualViewportWidth,
                     virtualViewportHeight, 0,
-                    -1, 1
+                    -100, 100
             );
 
             if (debugMode) {
@@ -188,7 +188,7 @@ public class Camera extends Component {
             projectionMatrix.identity().ortho(
                     0, viewportWidth,
                     viewportHeight, 0,
-                    -1, 1
+                    -100, 100
             );
 
             // Reset virtual viewport to match actual viewport
