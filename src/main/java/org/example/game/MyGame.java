@@ -106,17 +106,7 @@ public class MyGame {
         // Create collectibles
         createCollectibles();
 
-        GameObject starfieldObject = new GameObject("Starfield");
-        starfieldObject.setPosition(0, 0, 0); // Position at the origin of the scene or camera space
-
-
-        // Add the StarsComp component
-        StarsComp starsComp = new StarsComp();
-        starfieldObject.addComponent(starsComp);
-
-        // Add the starfield object to your scene
-        // Make sure this is done AFTER the camera is created and set for the scene
-        gameScene.addGameObject(starfieldObject); // Assuming 'gameScene' is your Scene variable
+        createStars();
 
 
         engine.setClearColor(0.2f, 0.2f, 0.3f);
@@ -222,6 +212,17 @@ public class MyGame {
 
             gameScene.addGameObject(collectible);
         }
+    }
+
+    private void createStars(){
+
+        GameObject starfieldObject = new GameObject("Starfield");
+        starfieldObject.setPosition(0, 0, 0);
+
+        StarsComp starsComp = new StarsComp();
+        starfieldObject.addComponent(starsComp);
+
+        gameScene.addGameObject(starfieldObject);
     }
 
     public void run() {

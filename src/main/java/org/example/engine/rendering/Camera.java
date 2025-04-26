@@ -28,10 +28,13 @@ public class Camera extends Component {
     private final Matrix4f viewMatrix = new Matrix4f();
     private final Matrix4f projectionMatrix = new Matrix4f();
     private final Matrix4f inverseViewMatrix = new Matrix4f();
+    private final Matrix4f combinedMatrix = new Matrix4f();
+    private final Matrix4f invertedMatrix = new Matrix4f();
 
     // Transformation caches
     private boolean viewMatrixDirty = true;
     private boolean projectionMatrixDirty = true;
+    private boolean combinedMatrixDirty = true;
 
     // Direct position reference to avoid Transform dependency issues
     private Vector3f cameraPosition = new Vector3f(0, 0, 0);
@@ -42,6 +45,9 @@ public class Camera extends Component {
     private float virtualViewportY = 0;
     private float virtualViewportWidth = 800;
     private float virtualViewportHeight = 600;
+
+    // Debug mode
+    private boolean debugMode = false;
 
     /**
      * Create a camera with default settings
@@ -114,6 +120,7 @@ public class Camera extends Component {
             }
 
             viewMatrixDirty = true;
+            combinedMatrixDirty = true;
         }
     }
 
@@ -137,6 +144,7 @@ public class Camera extends Component {
         inverseViewMatrix.set(viewMatrix).invert();
 
         viewMatrixDirty = false;
+        combinedMatrixDirty = true;
     }
 
     /**
@@ -163,12 +171,18 @@ public class Camera extends Component {
                 virtualViewportY = (viewportHeight - virtualViewportHeight) / 2f;
             }
 
-            // Create orthographic projection for the virtual viewport
+            // Create orthographic projection for the virtual viewport dimensions
             projectionMatrix.identity().ortho(
-                    virtualViewportX, virtualViewportX + virtualViewportWidth,
-                    virtualViewportY + virtualViewportHeight, virtualViewportY,
+                    0, virtualViewportWidth,
+                    virtualViewportHeight, 0,
                     -1, 1
             );
+
+            if (debugMode) {
+                System.out.println("Updated projection matrix with virtual viewport: " +
+                        virtualViewportWidth + "x" + virtualViewportHeight +
+                        " at " + virtualViewportX + "," + virtualViewportY);
+            }
         } else {
             // Original behavior - directly use viewport dimensions
             projectionMatrix.identity().ortho(
@@ -182,9 +196,32 @@ public class Camera extends Component {
             virtualViewportY = 0;
             virtualViewportWidth = viewportWidth;
             virtualViewportHeight = viewportHeight;
+
+            if (debugMode) {
+                System.out.println("Updated projection matrix with full viewport: " +
+                        viewportWidth + "x" + viewportHeight);
+            }
         }
 
         projectionMatrixDirty = false;
+        combinedMatrixDirty = true;
+    }
+
+    /**
+     * Update the combined view-projection matrix
+     */
+    private void updateCombinedMatrix() {
+        if (!combinedMatrixDirty) return;
+
+        // Ensure individual matrices are up to date
+        updateViewMatrix();
+        updateProjectionMatrix();
+
+        // Calculate combined matrix and its inverse
+        combinedMatrix.set(projectionMatrix).mul(viewMatrix);
+        invertedMatrix.set(combinedMatrix).invert();
+
+        combinedMatrixDirty = false;
     }
 
     /**
@@ -221,59 +258,52 @@ public class Camera extends Component {
 
     /**
      * Convert screen coordinates to world coordinates
+     * This is an integrated solution that properly handles virtual viewport
      */
     public Vector2f screenToWorld(float screenX, float screenY) {
-        updateViewMatrix();
+        // Ensure matrices are up to date
+        updateCombinedMatrix();
 
-        // Adjust for virtual viewport if maintaining aspect ratio
+        // Check if point is inside virtual viewport (when aspect ratio is maintained)
         if (maintainAspectRatio) {
-            screenX = (screenX - virtualViewportX) * (viewportWidth / virtualViewportWidth);
-            screenY = (screenY - virtualViewportY) * (viewportHeight / virtualViewportHeight);
+            if (screenX < virtualViewportX || screenX > virtualViewportX + virtualViewportWidth ||
+                    screenY < virtualViewportY || screenY > virtualViewportY + virtualViewportHeight) {
+                if (debugMode) {
+                    System.out.println("Click outside virtual viewport: " + screenX + "," + screenY);
+                }
+                // Return a point outside the view to indicate invalid location
+                return new Vector2f(Float.MAX_VALUE, Float.MAX_VALUE);
+            }
+
+            // Adjust for virtual viewport origin
+            screenX -= virtualViewportX;
+            screenY -= virtualViewportY;
         }
 
-        // Convert screen coordinates to normalized device coordinates
-        float ndcX = (2.0f * screenX) / viewportWidth - 1.0f;
-        float ndcY = 1.0f - (2.0f * screenY) / viewportHeight;
+        // Convert to normalized device coordinates (NDC)
+        // For the projection matrix defined with ortho(0, width, height, 0, -1, 1)
+        float ndcX = (2.0f * screenX / virtualViewportWidth) - 1.0f;
+        float ndcY = 1.0f - (2.0f * screenY / virtualViewportHeight);
 
-        // Create point in NDC space with z=0 (near plane)
+        // Create NDC point
         Vector3f ndcPoint = new Vector3f(ndcX, ndcY, 0);
 
-        // Convert to world space
-        Matrix4f invViewProj = new Matrix4f();
-        projectionMatrix.mul(viewMatrix, invViewProj);
-        invViewProj.invert();
+        // Transform to world space using the inverted combined matrix
+        Vector3f worldPoint = ndcPoint.mulPosition(invertedMatrix);
 
-        Vector3f worldPoint = ndcPoint.mulPosition(invViewProj);
+        if (debugMode) {
+            System.out.println("Screen (" + screenX + "," + screenY + ") -> World (" +
+                    worldPoint.x + "," + worldPoint.y + ")");
+        }
 
         return new Vector2f(worldPoint.x, worldPoint.y);
     }
 
     /**
-     * Convert world coordinates to screen coordinates
+     * Convert raw screen coordinates (including virtual viewport adjustment)
      */
-    public Vector2f worldToScreen(float worldX, float worldY) {
-        updateViewMatrix();
-
-        // Create point in world space
-        Vector3f worldPoint = new Vector3f(worldX, worldY, 0);
-
-        // Convert to NDC space
-        Matrix4f viewProj = new Matrix4f();
-        projectionMatrix.mul(viewMatrix, viewProj);
-
-        Vector3f ndcPoint = worldPoint.mulPosition(viewProj);
-
-        // Convert NDC to screen space
-        float screenX = (ndcPoint.x + 1.0f) * 0.5f * viewportWidth;
-        float screenY = (1.0f - ndcPoint.y) * 0.5f * viewportHeight;
-
-        // Adjust for virtual viewport if maintaining aspect ratio
-        if (maintainAspectRatio) {
-            screenX = virtualViewportX + screenX * (virtualViewportWidth / viewportWidth);
-            screenY = virtualViewportY + screenY * (virtualViewportHeight / viewportHeight);
-        }
-
-        return new Vector2f(screenX, screenY);
+    public Vector2f rawScreenToWorld(float rawScreenX, float rawScreenY) {
+        return screenToWorld(rawScreenX, rawScreenY);
     }
 
     /**
@@ -318,9 +348,16 @@ public class Camera extends Component {
      * Set the viewport size (e.g., when window resizes)
      */
     public void setViewportSize(float width, float height) {
-        this.viewportWidth = width;
-        this.viewportHeight = height;
-        projectionMatrixDirty = true;
+        if (this.viewportWidth != width || this.viewportHeight != height) {
+            this.viewportWidth = width;
+            this.viewportHeight = height;
+            projectionMatrixDirty = true;
+            combinedMatrixDirty = true;
+
+            if (debugMode) {
+                System.out.println("Camera viewport resized to: " + width + "x" + height);
+            }
+        }
     }
 
     /**
@@ -330,6 +367,11 @@ public class Camera extends Component {
         if (this.maintainAspectRatio != maintain) {
             this.maintainAspectRatio = maintain;
             projectionMatrixDirty = true;
+            combinedMatrixDirty = true;
+
+            if (debugMode) {
+                System.out.println("Aspect ratio preservation set to: " + maintain);
+            }
         }
     }
 
@@ -339,24 +381,29 @@ public class Camera extends Component {
     public void setOriginalAspectRatio(float aspectRatio) {
         this.originalAspectRatio = aspectRatio;
         projectionMatrixDirty = true;
+        combinedMatrixDirty = true;
     }
 
     /**
      * Get the current virtual viewport dimensions
      */
     public float getVirtualViewportWidth() {
+        updateProjectionMatrix(); // Ensure virtual viewport is up to date
         return virtualViewportWidth;
     }
 
     public float getVirtualViewportHeight() {
+        updateProjectionMatrix(); // Ensure virtual viewport is up to date
         return virtualViewportHeight;
     }
 
     public float getVirtualViewportX() {
+        updateProjectionMatrix(); // Ensure virtual viewport is up to date
         return virtualViewportX;
     }
 
     public float getVirtualViewportY() {
+        updateProjectionMatrix(); // Ensure virtual viewport is up to date
         return virtualViewportY;
     }
 
@@ -372,6 +419,7 @@ public class Camera extends Component {
         if (this.zoom != zoom) {
             this.zoom = zoom;
             viewMatrixDirty = true;
+            combinedMatrixDirty = true;
         }
     }
 
@@ -416,6 +464,7 @@ public class Camera extends Component {
         }
 
         viewMatrixDirty = true;
+        combinedMatrixDirty = true;
     }
 
     /**
@@ -432,8 +481,28 @@ public class Camera extends Component {
         return viewportHeight;
     }
 
-
+    /**
+     * Check if aspect ratio maintenance is enabled
+     */
     public boolean getMaintainAspectRatio() {
         return maintainAspectRatio;
+    }
+
+    /**
+     * Enable or disable debug mode
+     */
+    public void setDebugMode(boolean debug) {
+        this.debugMode = debug;
+    }
+
+    /**
+     * Check if a screen point is within the virtual viewport
+     */
+    public boolean isPointInVirtualViewport(float screenX, float screenY) {
+        return !maintainAspectRatio ||
+                (screenX >= virtualViewportX &&
+                        screenX <= virtualViewportX + virtualViewportWidth &&
+                        screenY >= virtualViewportY &&
+                        screenY <= virtualViewportY + virtualViewportHeight);
     }
 }

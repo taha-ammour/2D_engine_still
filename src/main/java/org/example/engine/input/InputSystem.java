@@ -5,6 +5,10 @@ import static org.lwjgl.glfw.GLFW.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.example.engine.rendering.Camera;
+import org.example.engine.scene.SceneManager;
+import org.joml.Vector2f;
+
 /**
  * System that handles user input from keyboard, mouse, and gamepads.
  * Provides easy access to current input state and events.
@@ -166,6 +170,61 @@ public class InputSystem {
      */
     public double getMouseY() {
         return mouseY;
+    }
+
+    /**
+     * Get the adjusted mouse X position that accounts for virtual viewport
+     * when aspect ratio maintenance is enabled
+     */
+    public double getAdjustedMouseX() {
+        Camera camera = getActiveCamera();
+        if (camera != null && camera.getMaintainAspectRatio()) {
+            // Adjust mouse coordinates to account for the virtual viewport
+            return mouseX - camera.getVirtualViewportX();
+        }
+        return mouseX;
+    }
+
+    /**
+     * Get the adjusted mouse Y position that accounts for virtual viewport
+     * when aspect ratio maintenance is enabled
+     */
+    public double getAdjustedMouseY() {
+        Camera camera = getActiveCamera();
+        if (camera != null && camera.getMaintainAspectRatio()) {
+            // Adjust mouse coordinates to account for the virtual viewport
+            return mouseY - camera.getVirtualViewportY();
+        }
+        return mouseY;
+    }
+
+    /**
+     * Convert screen coordinates to world coordinates
+     */
+    public Vector2f screenToWorldCoordinates(double screenX, double screenY) {
+        Camera camera = getActiveCamera();
+        if (camera != null) {
+            return camera.screenToWorld((float)screenX, (float)screenY);
+        }
+        return new Vector2f((float)screenX, (float)screenY);
+    }
+
+    /**
+     * Get the current mouse position in world coordinates
+     */
+    public Vector2f getMouseWorldCoordinates() {
+        return screenToWorldCoordinates(mouseX, mouseY);
+    }
+
+    /**
+     * Get the active camera from the current scene
+     */
+    private Camera getActiveCamera() {
+        if (SceneManager.getInstance() != null &&
+                SceneManager.getInstance().getActiveScene() != null) {
+            return SceneManager.getInstance().getActiveScene().getMainCamera();
+        }
+        return null;
     }
 
     /**

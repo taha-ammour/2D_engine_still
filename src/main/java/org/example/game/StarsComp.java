@@ -2,107 +2,156 @@ package org.example.game;
 
 import org.example.engine.core.Component;
 import org.example.engine.core.GameObject;
-import org.example.engine.core.Transform;
 import org.example.engine.rendering.Camera;
 import org.example.engine.rendering.Sprite;
+import org.example.engine.scene.Scene;
 import org.example.engine.scene.SceneManager;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+
 
 public class StarsComp extends Component {
 
     private int numStars = 100; // Number of stars
     private float minSpeed = 50.0f;  // Minimum star speed
     private float maxSpeed = 150.0f; // Maximum star speed
-    private int starSize = 2;       // Size of each star sprite
+    private int starSize = 5;       // Size of each star sprite
 
+    // Track stars and their speeds separately
     private final List<GameObject> starObjects = new ArrayList<>();
+    private final Map<GameObject, Float> starSpeeds = new HashMap<>();
     private final Random random = new Random();
 
     private float windowWidth;
     private float windowHeight;
+    private boolean initialized = false;
 
     @Override
     protected void onInit() {
-        // Get screen dimensions from the camera
-        Camera camera = SceneManager.getInstance().getActiveScene().getMainCamera();
-        if (camera == null) {
-            System.err.println("StarsComp requires a main camera in the scene.");
-            return;
-        }
-        // Use virtual viewport if aspect ratio is maintained, otherwise full viewport
-        windowWidth = camera.getMaintainAspectRatio() ? camera.getVirtualViewportWidth() : camera.getViewportWidth();
-        windowHeight = camera.getMaintainAspectRatio() ? camera.getVirtualViewportHeight() : camera.getViewportHeight();
-
-
-        // Create star game objects
-        for (int i = 0; i < numStars; i++) {
-            GameObject starGo = new GameObject("Star_" + i);
-
-            // Create a simple sprite for the star (e.g., white square)
-            Sprite starSprite = new Sprite(null, starSize, starSize);
-            starSprite.setColor(0xFFFFFF, 1.0f); // White color
-            starGo.addComponent(starSprite);
-
-            // Assign random speed
-            float speed = minSpeed + random.nextFloat() * (maxSpeed - minSpeed);
-            starGo.addComponent(new StarMovement(speed));
-
-            // Assign random initial position (mostly off-screen top)
-            float initialX = random.nextFloat() * windowWidth;
-            float initialY = -random.nextFloat() * windowHeight; // Start above the screen
-            starGo.setPosition(initialX, initialY, -1.0f); // Place behind other elements
-
-            // Add star as a child of the GameObject this component is attached to
-            // This ensures stars move relative to the StarsComp object if it moves
-            // If StarsComp is static, they just move within the screen space
-            getGameObject().addChild(starGo);
-
-            // Keep track of the star object
-            starObjects.add(starGo);
-        }
+        System.out.println("StarsComp.onInit() called - waiting for first update to initialize stars");
     }
 
     @Override
     protected void onUpdate(float deltaTime) {
+        // Initialize on first update to ensure scene is properly loaded
+        if (!initialized) {
+            initializeStars();
+            initialized = true;
+            return;
+        }
+
         // Update camera dimensions in case of resize
         Camera camera = SceneManager.getInstance().getActiveScene().getMainCamera();
-        if (camera != null) {
-            windowWidth = camera.getMaintainAspectRatio() ? camera.getVirtualViewportWidth() : camera.getViewportWidth();
-            windowHeight = camera.getMaintainAspectRatio() ? camera.getVirtualViewportHeight() : camera.getViewportHeight();
-        } else {
+        if (camera == null) {
             return; // Cannot update without camera info
         }
 
+        windowWidth = camera.getViewportWidth();
+        windowHeight = camera.getViewportHeight();
 
-        for (GameObject starGo : starObjects) {
-            if (!starGo.isActive()) continue;
+        // Update each star's position
+        for (GameObject starObj : new ArrayList<>(starObjects)) {
+            // Skip if star is not active or has been destroyed
+            if (starObj == null || !starObj.isActive()) continue;
 
-            Transform transform = starGo.getTransform();
-            StarMovement movement = starGo.getComponent(StarMovement.class);
-            Sprite sprite = starGo.getComponent(Sprite.class); // Get sprite for height
+            // Get the star's speed from our map
+            Float speed = starSpeeds.getOrDefault(starObj, 50.0f);
 
-            if (transform == null || movement == null || sprite == null) continue;
+            // Get current position
+            Vector3f position = starObj.getTransform().getPosition();
 
             // Move the star down
-            Vector3f currentPos = transform.getLocalPosition(); // Use local position relative to parent
-            currentPos.y += movement.speed * deltaTime;
+            position.y += speed * deltaTime;
 
             // If star goes below the screen, reset its position to the top
-            // Add sprite height to check to ensure it's fully off-screen
-            if (currentPos.y > windowHeight) {
-                currentPos.y = -sprite.getHeight(); // Reset just above the screen
-                currentPos.x = random.nextFloat() * windowWidth; // Randomize horizontal position
+            if (position.y > windowHeight) {
+                position.y = -10; // Reset just above the screen
+                position.x = random.nextFloat() * windowWidth; // Randomize horizontal position
             }
 
-            // Update the star's local position
-            transform.setLocalPosition(currentPos);
+            // Update star position
+            starObj.getTransform().setPosition(position);
         }
     }
+
+    /**
+     * Initialize stars on first update when scene is fully loaded
+     */
+    private void initializeStars() {
+        System.out.println("Initializing stars...");
+
+        // Get the current scene
+        Scene scene = SceneManager.getInstance().getActiveScene();
+        if (scene == null) {
+            System.err.println("ERROR: No active scene found for star initialization!");
+            return;
+        }
+
+        // Get camera for screen dimensions
+        Camera camera = scene.getMainCamera();
+        if (camera == null) {
+            System.err.println("ERROR: No main camera found for star initialization!");
+            return;
+        }
+
+        // Get screen dimensions
+        windowWidth = camera.getViewportWidth();
+        windowHeight = camera.getViewportHeight();
+
+        System.out.println("Creating " + numStars + " stars on screen dimensions: " +
+                windowWidth + "x" + windowHeight);
+
+        // Create individual star objects
+        for (int i = 0; i < numStars; i++) {
+            try {
+                // First create the GameObject
+                GameObject star = new GameObject("Star_" + i);
+
+                // Set initial position
+                float x = random.nextFloat() * windowWidth;
+                float y = random.nextFloat() * windowHeight; // Distribute across screen
+                float z = 0.0f; // Same plane as other objects
+                star.setPosition(x, y, z);
+
+                // IMPORTANT: Add to scene first
+                scene.addGameObject(star);
+
+                // Generate random speed
+                float speed = minSpeed + random.nextFloat() * (maxSpeed - minSpeed);
+
+                // Store in our maps
+                starObjects.add(star);
+                starSpeeds.put(star, speed);
+
+                // Now add sprite component AFTER adding to scene
+                Sprite starSprite = new Sprite(null, starSize, starSize);
+                starSprite.setColor(0xFFFFFF, 1.0f); // Bright white, fully opaque
+                star.addComponent(starSprite);
+
+                System.out.println("Created star #" + i + " at " + x + ", " + y);
+            } catch (Exception e) {
+                System.err.println("Error creating star: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("Stars initialization complete - created " + starObjects.size() + " stars");
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Clean up
+        for (GameObject star : starObjects) {
+            if (star != null && !star.isDestroyed()) {
+                star.destroy();
+            }
+        }
+        starObjects.clear();
+        starSpeeds.clear();
+    }
 }
-
-
-

@@ -158,22 +158,51 @@ public class Engine {
      * Handle window resize
      */
     private void onResize(int width, int height) {
-        // Update viewport
+        // Store the old dimensions to check for changes
+        int oldWidth = windowWidth;
+        int oldHeight = windowHeight;
+
+        // Update window dimensions
         windowWidth = width;
         windowHeight = height;
 
+        System.out.println("Window resized to: " + width + "x" + height);
+
+        // Update viewport
         GL11.glViewport(0, 0, width, height);
 
-        // Update camera
-        if (sceneManager.getActiveScene() != null &&
-                sceneManager.getActiveScene().getMainCamera() != null) {
-            Camera camera = sceneManager.getActiveScene().getMainCamera();
+        // Get the active camera
+        Camera camera = null;
+        if (sceneManager.getActiveScene() != null) {
+            camera = sceneManager.getActiveScene().getMainCamera();
+        }
 
+        // Update camera if available
+        if (camera != null) {
             // Update camera viewport size
             camera.setViewportSize(width, height);
 
-            // Make sure aspect ratio preservation is enabled (default is already true in the updated Camera class)
-            camera.setMaintainAspectRatio(true);
+            // Make sure aspect ratio preservation is enabled
+            camera.setMaintainAspectRatio(false);
+
+            // Force matrices to be recalculated
+            camera.getViewMatrix();
+            camera.getProjectionMatrix();
+
+            System.out.println("Camera updated with new viewport: " + width + "x" + height);
+
+            // Log virtual viewport details if maintaining aspect ratio
+            if (camera.getMaintainAspectRatio()) {
+                System.out.println("Virtual viewport: x=" + camera.getVirtualViewportX() +
+                        ", y=" + camera.getVirtualViewportY() +
+                        ", width=" + camera.getVirtualViewportWidth() +
+                        ", height=" + camera.getVirtualViewportHeight());
+            }
+        }
+
+        // If we have an active render system, make sure it reconfigures the viewport
+        if (renderSystem != null) {
+            renderSystem.configureViewport();
         }
 
     }

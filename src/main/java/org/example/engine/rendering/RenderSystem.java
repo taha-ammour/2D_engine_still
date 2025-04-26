@@ -167,7 +167,11 @@ public class RenderSystem {
     }
 
 
-    private void configureViewport() {
+    /**
+     * Configure the OpenGL viewport based on camera settings
+     * Changed from private to public so it can be called directly after window resize
+     */
+    public void configureViewport() {
         if (camera == null) {
             // No camera to configure viewport with
             return;
@@ -221,9 +225,20 @@ public class RenderSystem {
                     // Restore original clear color
                     GL11.glClearColor(currentColor[0], currentColor[1], currentColor[2], currentColor[3]);
                 }
+
+                if (verboseLogging) {
+                    System.out.println("Configured viewport with virtual area: " +
+                            "x=" + x + ", y=" + y +
+                            ", width=" + width + ", height=" + height);
+                }
             } else {
                 // Use full viewport area
                 GL11.glViewport(0, 0, (int)viewportWidth, (int)viewportHeight);
+
+                if (verboseLogging) {
+                    System.out.println("Configured viewport with full area: " +
+                            "width=" + viewportWidth + ", height=" + viewportHeight);
+                }
             }
         } catch (Exception e) {
             System.err.println("Error configuring viewport: " + e.getMessage());
@@ -550,7 +565,11 @@ public class RenderSystem {
         float y = renderable.getTransform().getPosition().y;
         float radius = Math.max(renderable.getWidth(), renderable.getHeight()) * 0.5f;
 
-        return camera.isInView(x, y, radius);
+        // Add a margin to avoid popping at screen edges (1.5x the radius)
+        float margin = radius * 1.5f;
+
+        // Use more lenient frustum check
+        return camera.isInView(x, y, radius + margin);
     }
 
     /**
