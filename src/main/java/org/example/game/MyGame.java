@@ -88,6 +88,7 @@ public class MyGame {
 
         // Create scene
         gameScene = engine.getSceneManager().createScene("GameScene");
+        gameScene.setAmbientLight(0.8f, 0.8f, 0.8f);
 
         // Set up camera
         createCamera();
@@ -100,11 +101,25 @@ public class MyGame {
         createPlayer();
 
         // Create enemies
-        //createEnemies();
+        createEnemies();
 
         // Create collectibles
         createCollectibles();
 
+        GameObject starfieldObject = new GameObject("Starfield");
+        starfieldObject.setPosition(0, 0, 0); // Position at the origin of the scene or camera space
+
+
+        // Add the StarsComp component
+        StarsComp starsComp = new StarsComp();
+        starfieldObject.addComponent(starsComp);
+
+        // Add the starfield object to your scene
+        // Make sure this is done AFTER the camera is created and set for the scene
+        gameScene.addGameObject(starfieldObject); // Assuming 'gameScene' is your Scene variable
+
+
+        engine.setClearColor(0.2f, 0.2f, 0.3f);
         // Load scene
         engine.getSceneManager().loadScene("GameScene");
     }
@@ -135,7 +150,7 @@ public class MyGame {
         Rigidbody rb = new Rigidbody();
         player.addComponent(rb);
 
-        BoxCollider collider = new BoxCollider(16, 16);
+        BoxCollider collider = new BoxCollider(playerSprite.getWidth(), playerSprite.getHeight());
         player.addComponent(collider);
 
         // Add player controller

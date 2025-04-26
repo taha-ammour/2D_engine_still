@@ -13,7 +13,7 @@ import org.example.engine.scene.SceneManager;
 import org.joml.Vector3f;
 
 public class Collectible extends Component {
-    private float rotationSpeed = 90.0f; // Degrees per second
+    private float rotationSpeed = 00.0f; // Degrees per second
     private float bobAmplitude = 0.5f;
     private float bobFrequency = 2.0f;
     private float initialY;
@@ -25,7 +25,7 @@ public class Collectible extends Component {
 
         // Add a collider for detection
         if (!getGameObject().hasComponent(BoxCollider.class)) {
-            BoxCollider collider = new BoxCollider(32, 32); // Size of the collectible
+            BoxCollider collider = new BoxCollider(16, 16); // Size of the collectible
             collider.setTrigger(true); // Set as trigger
             collider.setOnCollisionEnter(this::onCollision);
             getGameObject().addComponent(collider);

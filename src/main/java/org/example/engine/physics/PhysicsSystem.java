@@ -197,8 +197,11 @@ public class PhysicsSystem {
         // Clear previous collision info
         collisionCache.clear();
 
+        // Create a defensive copy of the colliders list to avoid ConcurrentModificationException
+        List<Collider> collidersCopy = new ArrayList<>(colliders);
+
         // Check for collisions
-        for (Collider collider : colliders) {
+        for (Collider collider : collidersCopy) {
             if (!collider.isActive()) continue;
 
             // Get potential collision candidates from spatial grid

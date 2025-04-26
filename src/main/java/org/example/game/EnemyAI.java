@@ -19,7 +19,8 @@ public class EnemyAI extends Component {
     private int currentPatrolIndex = 0;
     private float moveSpeed = 100.0f;
     private float chaseSpeed = 150.0f;
-    private float detectionRange = 200.0f;
+    private float detectionRange = 20.0f;
+    private float Health = 100;
     private GameObject player;
     private Sprite sprite;
 
@@ -36,7 +37,7 @@ public class EnemyAI extends Component {
 
         // Add collider for interactions
         if (!getGameObject().hasComponent(BoxCollider.class)) {
-            BoxCollider collider = new BoxCollider(32, 32);
+            BoxCollider collider = new BoxCollider(16, 16);
             collider.setOnCollisionEnter(this::onCollision);
             getGameObject().addComponent(collider);
         }
@@ -44,7 +45,7 @@ public class EnemyAI extends Component {
 
     @Override
     protected void onUpdate(float deltaTime) {
-        
+
         if (player == null) {
             // Find player in the active scene
             Scene activeScene = SceneManager.getInstance().getActiveScene();
@@ -167,10 +168,10 @@ public class EnemyAI extends Component {
         // Handle collision with player (damage, etc.)
         if (collision.colliderB.getGameObject().getName().equals("Player")) {
             // Deal damage to player
-//            PlayerHealth playerHealth = player.getComponent(PlayerHealth.class);
-//            if (playerHealth != null) {
-//                playerHealth.takeDamage(10);
-//            }
+            PlayerHealth playerHealth = player.getComponent(PlayerHealth.class);
+            if (playerHealth != null) {
+                playerHealth.takeDamage(10);
+            }
 
             // Knockback effect
             Vector3f playerPos = player.getTransform().getPosition();
@@ -182,5 +183,9 @@ public class EnemyAI extends Component {
                 playerRb.addForce(knockbackDir.x * 500, knockbackDir.y * 500);
             }
         }
+        if (collision.colliderB.getGameObject().getName().equals("Bullet")){
+
+        }
+
     }
 }

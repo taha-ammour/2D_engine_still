@@ -68,17 +68,17 @@ public class GameObject implements EventListener {
         if (!active) return;
 
         // Update components
-        for (Component component : componentList) {
-            if (component.isActive()) {
-                component.onUpdate(deltaTime);
-                component.onUpdate(deltaTime);
+        for (Component component : new ArrayList<>(componentList)) {
+            if (component != null && component.isActive()) {
                 component.onUpdate(deltaTime);
             }
         }
 
         // Update children
         for (GameObject child : new ArrayList<>(children)) {
-            child.update(deltaTime);
+            if (child != null && !child.isDestroyed()) {
+                child.update(deltaTime);
+            }
         }
     }
 
@@ -89,15 +89,17 @@ public class GameObject implements EventListener {
         if (!active) return;
 
         // Late update components
-        for (Component component : componentList) {
-            if (component.isActive()) {
+        for (Component component : new ArrayList<>(componentList)) {
+            if (component != null && component.isActive()) {
                 component.onLateUpdate(deltaTime);
             }
         }
 
         // Late update children
         for (GameObject child : new ArrayList<>(children)) {
-            child.lateUpdate(deltaTime);
+            if (child != null && !child.isDestroyed()) {
+                child.lateUpdate(deltaTime);
+            }
         }
     }
 
