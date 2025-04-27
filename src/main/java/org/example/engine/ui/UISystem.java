@@ -1,7 +1,11 @@
 package org.example.engine.ui;
 
 import org.example.engine.core.GameObject;
+import org.example.engine.rendering.Camera;
 import org.example.engine.rendering.RenderSystem;
+import org.example.engine.scene.SceneManager;
+import org.joml.Vector2f;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -10,6 +14,7 @@ import java.util.List;
 /**
  * Central management system for UI elements.
  * Handles rendering, layout, and input forwarding to UI elements.
+ * Modified to use screen-space coordinates.
  */
 public class UISystem {
     private static UISystem instance;
@@ -25,6 +30,9 @@ public class UISystem {
 
     // The rendering system reference
     private RenderSystem renderSystem;
+
+    // The camera reference
+    private Camera camera;
 
     /**
      * Get the singleton instance
@@ -51,6 +59,11 @@ public class UISystem {
 
         // Create a root GameObject for all UI elements
         uiRoot = new GameObject("UI_Root");
+
+        // Get camera reference
+        if (SceneManager.getInstance().getActiveScene() != null) {
+            camera = SceneManager.getInstance().getActiveScene().getMainCamera();
+        }
     }
 
     /**
@@ -58,12 +71,31 @@ public class UISystem {
      * @param deltaTime Time since last frame
      */
     public void update(float deltaTime) {
+        // Update camera reference if needed
+        if (camera == null && SceneManager.getInstance().getActiveScene() != null) {
+            camera = SceneManager.getInstance().getActiveScene().getMainCamera();
+        }
+
+        // Update UI positions to follow camera
+        updateUIPositions();
+
         // Update root elements
         for (UIElement element : rootElements) {
             if (element.isActive()) {
                 element.onUpdate(deltaTime);
             }
         }
+    }
+
+    /**
+     * Update UI positions to follow camera
+     */
+    private void updateUIPositions() {
+        if (camera == null || uiRoot == null) return;
+
+        // Position uiRoot at camera position
+        Vector3f cameraPos = camera.getPosition();
+        uiRoot.setPosition(cameraPos.x, cameraPos.y, cameraPos.z);
     }
 
     /**
@@ -165,6 +197,11 @@ public class UISystem {
      * @return The topmost UI element at the position, or null if none
      */
     public UIElement findElementAt(float screenX, float screenY) {
+        if (camera == null) return null;
+
+        // Convert screen position to world position
+        Vector2f worldPos = camera.screenToWorld(screenX, screenY);
+
         // Sort elements by Z index (descending) to get topmost first
         List<UIElement> sortedElements = new ArrayList<>(rootElements);
         sortedElements.sort(Comparator.comparingInt((UIElement e) -> e.zIndex).reversed());
@@ -172,7 +209,7 @@ public class UISystem {
         // Find first element that contains the point
         for (UIElement element : sortedElements) {
             if (element.isVisible()) {
-                UIElement result = findElementAtRecursive(element, screenX, screenY);
+                UIElement result = findElementAtRecursive(element, worldPos.x, worldPos.y);
                 if (result != null) {
                     return result;
                 }
@@ -185,7 +222,7 @@ public class UISystem {
     /**
      * Recursively search for an element at the specified position
      */
-    private UIElement findElementAtRecursive(UIElement element, float screenX, float screenY) {
+    private UIElement findElementAtRecursive(UIElement element, float worldX, float worldY) {
         // Get element bounds
         UIElement result = null;
 
@@ -195,7 +232,7 @@ public class UISystem {
 
         for (UIElement child : sortedChildren) {
             if (child.isVisible()) {
-                result = findElementAtRecursive(child, screenX, screenY);
+                result = findElementAtRecursive(child, worldX, worldY);
                 if (result != null) {
                     return result;
                 }
@@ -203,7 +240,7 @@ public class UISystem {
         }
 
         // Check if point is within this element's bounds
-        if (isPointInElement(element, screenX, screenY)) {
+        if (isPointInElement(element, worldX, worldY)) {
             return element;
         }
 
@@ -216,7 +253,7 @@ public class UISystem {
     private boolean isPointInElement(UIElement element, float x, float y) {
         if (!element.isVisible()) return false;
 
-        org.joml.Vector2f pos = element.getGlobalPosition();
+        Vector2f pos = element.getGlobalPosition();
         return x >= pos.x && x <= pos.x + element.getWidth() &&
                 y >= pos.y && y <= pos.y + element.getHeight();
     }
@@ -226,5 +263,21 @@ public class UISystem {
      */
     public GameObject getUIRoot() {
         return uiRoot;
+    }
+
+    /**
+     * Get the current camera
+     */
+    public Camera getCamera() {
+        return camera;
+    }
+
+    /**
+     * Convert screen coordinates to UI coordinates
+     */
+    public Vector2f screenToUICoordinates(float screenX, float screenY) {
+        if (camera == null) return new Vector2f(screenX, screenY);
+
+        return camera.screenToWorld(screenX, screenY);
     }
 }

@@ -10,6 +10,7 @@ import org.example.engine.scene.SceneManager;
 
 /**
  * Creates and manages the game UI elements using UI sprites
+ * Modified to use screen-space positioning instead of world-space
  */
 public class GameUI extends Component {
     // UI Element positioning constants
@@ -118,6 +119,7 @@ public class GameUI extends Component {
 
     /**
      * Update the positions of all UI elements to align with screen
+     * This uses camera-relative positioning instead of world coordinates
      */
     private void updatePositions() {
         if (camera == null) return;
@@ -126,9 +128,14 @@ public class GameUI extends Component {
         float screenWidth = camera.getViewportWidth();
         float screenHeight = camera.getViewportHeight();
 
-        // Calculate positions for top-left aligned UI
-        float baseX = UI_PADDING;
-        float baseY = UI_PADDING;
+        // Get camera position
+        float cameraX = camera.getPosition().x;
+        float cameraY = camera.getPosition().y;
+
+        // Calculate UI element positions in camera space
+        // This is the key part - we add the camera position to keep UI fixed to camera view
+        float baseX = cameraX - (screenWidth / 2) + UI_PADDING;
+        float baseY = cameraY - (screenHeight / 2) + UI_PADDING;
 
         // Update positions of each element
         updateElementPosition(healthIcon, baseX, baseY, 0);
@@ -136,7 +143,7 @@ public class GameUI extends Component {
         updateElementPosition(armorIcon, baseX, baseY, 2);
 
         // Coin counter in top-right
-        float rightX = screenWidth - UI_PADDING - ICON_SIZE;
+        float rightX = cameraX + (screenWidth / 2) - UI_PADDING - ICON_SIZE;
         updateElementPosition(coinCounter, rightX, baseY, 0);
 
         // Key counter below coin counter

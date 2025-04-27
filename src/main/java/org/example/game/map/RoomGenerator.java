@@ -11,8 +11,15 @@ import org.example.engine.scene.Scene;
  */
 public class RoomGenerator {
     // Tile sizes
-    private static final float SMALL_TILE_SIZE = 8.0f * 2; // 8x8 tiles
-    private static final float NORMAL_TILE_SIZE = 16.0f * 2; // 16x16 tiles
+    // Base tile size - sprites are generally 16x16 pixels
+    private static final float BASE_TILE_SIZE = 16.0f;
+
+    // Scale factor for sprites (matching your game's overall scaling)
+    private static final float SCALE_FACTOR = 2.0f;
+
+    // Effective tile sizes after scaling
+    private static final float TILE_SIZE = BASE_TILE_SIZE * SCALE_FACTOR;
+    private static final float HALF_TILE_SIZE = BASE_TILE_SIZE * SCALE_FACTOR / 2.0f;
 
     // Room parameters
     private final int roomWidth;  // In tiles (normal size)
@@ -68,8 +75,8 @@ public class RoomGenerator {
                 String tileType = floorTileTypes[tileIndex];
 
                 // Calculate position
-                float posX = startX + (x * NORMAL_TILE_SIZE);
-                float posY = startY + (y * NORMAL_TILE_SIZE);
+                float posX = startX + (x * TILE_SIZE);
+                float posY = startY + (y * TILE_SIZE);
 
                 // Create floor tile
                 createTile(tileType, posX, posY, -0.1f, false);
@@ -86,8 +93,8 @@ public class RoomGenerator {
         // Calculate room bounds
         float roomStartX = startX;
         float roomStartY = startY;
-        float roomEndX = startX + (roomWidth * NORMAL_TILE_SIZE);
-        float roomEndY = startY + (roomHeight * NORMAL_TILE_SIZE);
+        float roomEndX = startX + (roomWidth * TILE_SIZE);
+        float roomEndY = startY + (roomHeight * TILE_SIZE);
 
         // TOP WALL
         // Top-left corner
@@ -95,32 +102,32 @@ public class RoomGenerator {
 
         // Top edge
         for (int x = 1; x < roomWidth * 2 - 1; x++) {
-            createTile("tile_up_3u", roomStartX + (x * NORMAL_TILE_SIZE), roomStartY, wallZ, true);
+            createTile("tile_up_3u", roomStartX + (x * TILE_SIZE), roomStartY, wallZ, true);
         }
 
         // Top-right corner
-        createTile("tile_sp_ur_1", roomEndX - NORMAL_TILE_SIZE, roomStartY, wallZ, true);
+        createTile("tile_sp_ur_1", roomEndX - TILE_SIZE, roomStartY, wallZ, true);
 
         // BOTTOM WALL
         // Bottom-left corner
-        createTile("tile_corner_ld_1", roomStartX, roomEndY - NORMAL_TILE_SIZE, wallZ, true);
+        createTile("tile_corner_ld_1", roomStartX, roomEndY - TILE_SIZE, wallZ, true);
 
         // Bottom edge
         for (int x = 1; x < roomWidth * 2 - 1; x++) {
-            createTile("tile_down_1", roomStartX + (x * NORMAL_TILE_SIZE), roomEndY - NORMAL_TILE_SIZE, wallZ, true);
+            createTile("tile_down_1", roomStartX + (x * TILE_SIZE), roomEndY - TILE_SIZE, wallZ, true);
         }
 
         // Bottom-right corner
-        createTile("tile_corner_rd_1", roomEndX - NORMAL_TILE_SIZE, roomEndY - NORMAL_TILE_SIZE, wallZ, true);
+        createTile("tile_corner_rd_1", roomEndX - TILE_SIZE, roomEndY - TILE_SIZE, wallZ, true);
 
         // LEFT WALL
         for (int y = 1; y < roomHeight * 2 - 1; y++) {
-            createTile("tile_l_1", roomStartX, roomStartY + (y * NORMAL_TILE_SIZE), wallZ, true);
+            createTile("tile_l_1", roomStartX, roomStartY + (y * TILE_SIZE), wallZ, true);
         }
 
         // RIGHT WALL
         for (int y = 1; y < roomHeight * 2 - 1; y++) {
-            createTile("tile_r_1", roomEndX - NORMAL_TILE_SIZE, roomStartY + (y * NORMAL_TILE_SIZE), wallZ, true);
+            createTile("tile_r_1", roomEndX - TILE_SIZE, roomStartY + (y * TILE_SIZE), wallZ, true);
         }
 
         // Add some decorative elements on the walls
@@ -135,21 +142,21 @@ public class RoomGenerator {
         float torchZ = 0.0f;
 
         // Add a few torches on the left wall
-        createTile("tile_candle_1", startX, startY + (roomHeight * NORMAL_TILE_SIZE / 3), torchZ, false);
-        createTile("tile_candle_1", startX, startY + (2 * roomHeight * NORMAL_TILE_SIZE / 3), torchZ, false);
+        createTile("tile_candle_1", startX, startY + (roomHeight * TILE_SIZE / 3), torchZ, false);
+        createTile("tile_candle_1", startX, startY + (2 * roomHeight * TILE_SIZE / 3), torchZ, false);
 
         // Add a few torches on the right wall
-        createTile("tile_candle_1", startX + (roomWidth * NORMAL_TILE_SIZE) - SMALL_TILE_SIZE,
-                startY + (roomHeight * NORMAL_TILE_SIZE / 3), torchZ, false);
-        createTile("tile_candle_1", startX + (roomWidth * NORMAL_TILE_SIZE) - SMALL_TILE_SIZE,
-                startY + (2 * roomHeight * NORMAL_TILE_SIZE / 3), torchZ, false);
+        createTile("tile_candle_1", startX + (roomWidth * TILE_SIZE) - HALF_TILE_SIZE,
+                startY + (roomHeight * TILE_SIZE / 3), torchZ, false);
+        createTile("tile_candle_1", startX + (roomWidth * TILE_SIZE) - HALF_TILE_SIZE,
+                startY + (2 * roomHeight * TILE_SIZE / 3), torchZ, false);
 
         // Add decorative elements (banners, etc)
         int numDecorations = Math.min(roomWidth / 3, 3); // Limit decorations based on room size
         for (int i = 0; i < numDecorations; i++) {
             int position = (i + 1) * (roomWidth / (numDecorations + 1));
-            createTile("tile_banner", startX + (position * NORMAL_TILE_SIZE),
-                    startY + SMALL_TILE_SIZE, torchZ, false);
+            createTile("tile_banner", startX + (position * TILE_SIZE),
+                    startY + HALF_TILE_SIZE, torchZ, false);
         }
     }
 

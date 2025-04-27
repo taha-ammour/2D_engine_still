@@ -27,6 +27,7 @@ public class EntityRegistry {
 
     public static void registerEntities(SpriteManager spriteManager) {
         // Load the sprite sheet named "entities".
+        spriteManager.loadSpriteSheet("font", "/textures/font.png");
         spriteManager.loadSpriteSheet("entities", "/textures/entities.png");
 
         // Player sprites (IDs 1-4)
