@@ -9,6 +9,7 @@ import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
 import java.nio.FloatBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,6 +35,10 @@ public class BitmapFontRenderer extends Component implements Renderable {
     private float lineSpacing = 1.2f;
     private int currentColor = 0xFFFFFF;  // White
     private float alpha = 1.0f;
+    private boolean flipX = false;
+    private boolean flipY = false;
+
+    private float[] paletteColors = new float[12];
 
     // Sprite resource
     private Texture fontTexture;
@@ -97,6 +102,13 @@ public class BitmapFontRenderer extends Component implements Renderable {
         // Create placeholder sprite to use its shader
         sprite = new Sprite(null, characterSize, characterSize);
 
+        for (int i = 0; i < 4; i++) {
+            float value = i / 3.0f; // 0, 0.33, 0.67, 1.0
+            paletteColors[i*3] = value;
+            paletteColors[i*3+1] = value;
+            paletteColors[i*3+2] = value;
+        }
+
         // Allocate vertex buffer for rendering
         vertexBuffer = BufferUtils.createFloatBuffer(1024 * 4 * 9); // 1024 characters max, 4 vertices per char, 9 floats per vertex
     }
@@ -147,6 +159,30 @@ public class BitmapFontRenderer extends Component implements Renderable {
 
         // Unbind VAO
         glBindVertexArray(0);
+    }
+
+    public void setPaletteFromCodes(String[] paletteCodes) {
+
+        if (paletteCodes == null || paletteCodes.length != 4) {
+            throw new IllegalArgumentException("Expected exactly 4 palette codes");
+        }
+
+        if (Arrays.equals(paletteCodes, this.colorPalette)) {
+            return;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            String code = paletteCodes[i].trim();
+            if (code.length() != 3) {
+                throw new IllegalArgumentException("Palette code at index " + i + " must be exactly 3 characters long");
+            }
+
+            // Convert from "012" format to RGB [0.0-1.0] values
+            paletteColors[i*3] = (code.charAt(0) - '0') / 5.0f;
+            paletteColors[i*3+1] = (code.charAt(1) - '0') / 5.0f;
+            paletteColors[i*3+2] = (code.charAt(2) - '0') / 5.0f;
+        }
+        needsRebuild = true;
     }
 
     @Override
@@ -209,6 +245,16 @@ public class BitmapFontRenderer extends Component implements Renderable {
 
         // Set color (current color is applied via vertex colors)
         shader.setUniform4f("u_Color", 1.0f, 1.0f, 1.0f, 1.0f);
+
+        shader.setUniform3fv("u_Palette", paletteColors);
+
+        // Set flip flags
+        shader.setUniform1i("u_flipX", flipX ? 1 : 0);
+        shader.setUniform1i("u_flipY", flipY ? 1 : 0);
+
+        Vector3f viewPos = renderSystem.getCamera().getPosition();
+        shader.setUniform3f("u_ViewPos", viewPos.x, viewPos.y, viewPos.z);
+
 
         // Enable blending for transparency
         glEnable(GL_BLEND);
