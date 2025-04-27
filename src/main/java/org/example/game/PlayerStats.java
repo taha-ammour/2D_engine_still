@@ -39,11 +39,14 @@ public class PlayerStats extends Component {
             GameObject uiContainer = scene.findGameObjectByTag("UI");
             if (uiContainer != null) {
                 gameUI = uiContainer.getComponent(GameUI.class);
+                if (gameUI != null) {
+                    System.out.println("PlayerStats: Found GameUI component");
+                } else {
+                    System.out.println("PlayerStats: Found UI container but GameUI component is missing");
+                }
+            } else {
+                System.out.println("PlayerStats: UI container with tag 'UI' not found");
             }
-        }
-
-        if (gameUI == null) {
-            System.out.println("Warning: GameUI not found, UI updates will be disabled");
         }
     }
 

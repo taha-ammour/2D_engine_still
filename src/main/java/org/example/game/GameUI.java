@@ -3,6 +3,7 @@ package org.example.game;
 import org.example.engine.SpriteManager;
 import org.example.engine.core.Component;
 import org.example.engine.core.GameObject;
+import org.example.engine.rendering.BitmapFontRenderer;
 import org.example.engine.rendering.Camera;
 import org.example.engine.rendering.Sprite;
 import org.example.engine.scene.Scene;
@@ -98,6 +99,7 @@ public class GameUI extends Component {
     private GameObject createUIElement(String spriteName, String labelText, int position) {
         GameObject element = new GameObject("UI_" + spriteName);
 
+
         // Get sprite from registry
         Sprite iconSprite = spriteManager.createSprite(spriteName);
         if (iconSprite != null) {
@@ -105,11 +107,17 @@ public class GameUI extends Component {
 
             // Scale up small UI icons
             if (iconSprite.getWidth() <= 8) {
-                element.setScale(3.0f, 3.0f, 1.0f);
+                element.setScale(1.0f, 1.0f, 1.0f);
             }
         } else {
             System.err.println("Failed to create UI sprite: " + spriteName);
         }
+
+
+        BitmapFontRenderer textRenderer = new BitmapFontRenderer();
+        textRenderer.setText(labelText);
+
+        element.addComponent(textRenderer);
 
         // Set to a high Z value to ensure it renders on top
         element.setPosition(0, 0, 10);

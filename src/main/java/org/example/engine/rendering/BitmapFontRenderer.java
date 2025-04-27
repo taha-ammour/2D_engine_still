@@ -92,6 +92,8 @@ public class BitmapFontRenderer extends Component implements Renderable {
             }
         }
 
+        charPositions.put(' ', new CharPosition(-1, -1));
+
         // Create placeholder sprite to use its shader
         sprite = new Sprite(null, characterSize, characterSize);
 
@@ -316,6 +318,15 @@ public class BitmapFontRenderer extends Component implements Renderable {
                     x = -textWidth / 2;
                 }
 
+                continue;
+            }
+
+            if (c == ' ') {
+                // For space, just advance the cursor without drawing anything
+                float spaceWidth = characterSize * scale * 0.8f; // Adjust space width as needed
+
+                // Move to next character position
+                x += spaceWidth;
                 continue;
             }
 

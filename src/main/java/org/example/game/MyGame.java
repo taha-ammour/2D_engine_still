@@ -16,7 +16,6 @@ import org.example.engine.resource.ResourceManager;
 import org.example.engine.scene.Scene;
 import org.example.engine.scene.SceneManager;
 import org.example.engine.ui.UISystem;
-import org.example.game.font.CameraUIManager;
 import org.example.game.map.FloorDecorator;
 import org.example.game.map.RoomGenerator;
 import org.joml.Vector3f;
@@ -110,6 +109,8 @@ public class MyGame {
 
         createRoom();
 
+        createUI();
+
         // Create player
         createPlayer();
 
@@ -121,7 +122,6 @@ public class MyGame {
 
         createStars();
 
-        createUI();
 
 
 
@@ -226,21 +226,21 @@ public class MyGame {
 
     }
 
-//    private void createUI() {
-//        // Create a UI container object
-//        GameObject uiContainer = new GameObject("UI_Container");
-//        uiContainer.setTag("UI"); // Tag for finding it later
-//        uiContainer.setPosition(0, 0, 10); // High Z to render on top
-//
-//        // Add UI component
-//        GameUI gameUI = new GameUI();
-//        uiContainer.addComponent(gameUI);
-//
-//        // Add to scene
-//        gameScene.addGameObject(uiContainer);
-//
-//        System.out.println("Game UI created");
-//    }
+    private void createUI() {
+        // Create a UI container object
+        GameObject uiContainer = new GameObject("UI_Container");
+        uiContainer.setTag("UI"); // Tag for finding it later
+        uiContainer.setPosition(0, 0, 10); // High Z to render on top
+
+        // Add UI component
+        GameUI gameUI = new GameUI();
+        uiContainer.addComponent(gameUI);
+
+        // Add to scene
+        gameScene.addGameObject(uiContainer);
+
+        System.out.println("Game UI created");
+    }
 
     private void createEnemies() {
 
@@ -275,68 +275,61 @@ public class MyGame {
 
     }
 
-    private void createUI(){
-        // Initialize UI System (this should happen before creating UI elements)
-        UISystem uiSystem = UISystem.getInstance();
-        uiSystem.init(RenderSystem.getInstance());
-        System.out.println("UI System initialized");
-
-        // Create UI container for GameUI
-        GameObject uiContainer = new GameObject("UI_Container");
-        uiContainer.setTag("UI"); // Tag for finding it later
-        gameScene.addGameObject(uiContainer);
-
-        // Add GameUI component
-        GameUI gameUI = new GameUI();
-        uiContainer.addComponent(gameUI);
-        System.out.println("Game UI created");
-
-        // Example of creating text using BitmapFontRenderer
-        GameObject textObj = new GameObject("GameTitle");
-        // Don't set position yet, the CameraUIManager will handle it
-        gameScene.addGameObject(textObj);
-
-        BitmapFontRenderer textRenderer = new BitmapFontRenderer();
-        textRenderer.setText("\\DBL\\CTX\\550GAME TITLE\\RES");
-        textRenderer.setScale(3.0f);
-        textObj.addComponent(textRenderer);
-        System.out.println("Game title text created with BitmapFontRenderer");
-
-        // Create additional UI elements
-        GameObject healthText = new GameObject("HealthText");
-        gameScene.addGameObject(healthText);
-
-        BitmapFontRenderer healthRenderer = new BitmapFontRenderer();
-        healthRenderer.setText("\\550HEALTH: 100\\RES");
-        healthRenderer.setScale(2.0f);
-        healthText.addComponent(healthRenderer);
-
-        // Create score text
-        GameObject scoreText = new GameObject("ScoreText");
-        gameScene.addGameObject(scoreText);
-
-        BitmapFontRenderer scoreRenderer = new BitmapFontRenderer();
-        scoreRenderer.setText("\\550SCORE: 0\\RES");
-        scoreRenderer.setScale(2.0f);
-        scoreText.addComponent(scoreRenderer);
-
-        // Create the CameraUIManager to handle UI positioning
-        GameObject uiManager = new GameObject("CameraUIManager");
-        gameScene.addGameObject(uiManager);
-
-        // Create CameraUIManager with the UI elements that need to follow the camera
-        CameraUIManager cameraUIManager = new CameraUIManager(textObj, healthText, scoreText, uiContainer);
-        uiManager.addComponent(cameraUIManager);
-
-        // Set relative positions for each UI element (relative to camera position)
-        // For a 800x600 viewport, camera center is at (400, 300)
-        // Title at top center
-        float viewportWidth = 800;
-        float viewportHeight = 600;
-        textObj.setPosition(0, 9, 0);  // The CameraUIManager will update this position
-        healthText.setPosition(20, 20, 10);  // Top-left
-        scoreText.setPosition(viewportWidth - 150, 20, 10);  // Top-right
-    }
+//    private void createUI(){
+//        // Initialize UI System (this should happen before creating UI elements)
+//        UISystem uiSystem = UISystem.getInstance();
+//        uiSystem.init(RenderSystem.getInstance());
+//        System.out.println("UI System initialized");
+//
+//        // Create UI container for GameUI
+//        GameObject uiContainer = new GameObject("UI_Container");
+//        uiContainer.setTag("UI"); // Tag for finding it later
+//        gameScene.addGameObject(uiContainer);
+//
+//        // Add GameUI component
+//        GameUI gameUI = new GameUI();
+//        uiContainer.addComponent(gameUI);
+//        System.out.println("Game UI created");
+//
+//        // Example of creating text using BitmapFontRenderer
+//        GameObject textObj = new GameObject("GameTitle");
+//        // Don't set position yet, the CameraUIManager will handle it
+//        gameScene.addGameObject(textObj);
+//
+//        BitmapFontRenderer textRenderer = new BitmapFontRenderer();
+//        textRenderer.setText("\\DBL\\CTX\\550GAME TITLE\\RES");
+//        textRenderer.setScale(3.0f);
+//        textObj.addComponent(textRenderer);
+//        System.out.println("Game title text created with BitmapFontRenderer");
+//
+//        // Create additional UI elements
+//        GameObject healthText = new GameObject("HealthText");
+//        gameScene.addGameObject(healthText);
+//
+//        BitmapFontRenderer healthRenderer = new BitmapFontRenderer();
+//        healthRenderer.setText("\\550HEALTH: 100\\RES");
+//        healthRenderer.setScale(2.0f);
+//        healthText.addComponent(healthRenderer);
+//
+//        // Create score text
+//        GameObject scoreText = new GameObject("ScoreText");
+//        gameScene.addGameObject(scoreText);
+//
+//        BitmapFontRenderer scoreRenderer = new BitmapFontRenderer();
+//        scoreRenderer.setText("\\550SCORE: 0\\RES");
+//        scoreRenderer.setScale(2.0f);
+//        scoreText.addComponent(scoreRenderer);
+//
+//        // Create the CameraUIManager to handle UI positioning
+//        GameObject uiManager = new GameObject("CameraUIManager");
+//        gameScene.addGameObject(uiManager);
+//
+//        float viewportWidth = 800;
+//        float viewportHeight = 600;
+//        textObj.setPosition(100, 29, 1);  // The CameraUIManager will update this position
+//        healthText.setPosition(20, 20, 1);  // Top-left
+//        scoreText.setPosition(viewportWidth - 150, 20, 10);  // Top-right
+//    }
 
     private void createCollectibles() {
         float roomStartX = ROOM_START_X + 32; // Keep away from walls
@@ -358,13 +351,9 @@ public class MyGame {
 
             // Use just the first emerald sprite initially - animation will change it
             Sprite collectibleSprite = spriteManager.createSprite("Emerald_id_1");
-            Sprite collectibleSprite1 = spriteManager.createSprite("Emerald_id_2");
-            Sprite collectibleSprite2 = spriteManager.createSprite("Emerald_id_3");
 
             if (collectibleSprite != null) {
                 collectible.addComponent(collectibleSprite);
-                collectible.addComponent(collectibleSprite1);
-                collectible.addComponent(collectibleSprite2);
 
                 // FIRST add to scene - IMPORTANT: do this before adding the animator component
                 gameScene.addGameObject(collectible);

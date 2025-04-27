@@ -12,6 +12,8 @@ import org.example.engine.scene.Scene;
 public class RoomGenerator {
     // Tile sizes
     // Base tile size - sprites are generally 16x16 pixels
+    private final Biome biome;
+
     private static final float BASE_TILE_SIZE = 16.0f;
 
     // Scale factor for sprites (matching your game's overall scaling)
@@ -38,6 +40,7 @@ public class RoomGenerator {
         this.roomHeight = roomHeight;
         this.startX = startX;
         this.startY = startY;
+        this.biome = Biome.randomBiome();
     }
 
     /**
@@ -88,7 +91,7 @@ public class RoomGenerator {
      * Generate walls around the room
      */
     private void generateWalls() {
-        float wallZ = 0.0f; // Walls at same Z level as player
+        float wallZ = -0.09f; // Walls at same Z level as player
 
         // Calculate room bounds
         float roomStartX = startX;
@@ -177,6 +180,7 @@ public class RoomGenerator {
         // Create sprite
         Sprite sprite = spriteManager.createSprite(tileName);
         if (sprite != null) {
+            sprite.setPaletteFromCodes(biome.getPaletteCodes());
             tile.addComponent(sprite);
 
             // Add collider for walls
