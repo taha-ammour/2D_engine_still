@@ -180,7 +180,6 @@ public class MyGame {
         cameraObj.addComponent(cameraFollow);
     }
 
-
     private void createPlayer() {
         GameObject player = new GameObject("Player");
         player.setTag("Player");
@@ -218,7 +217,7 @@ public class MyGame {
         player.addComponent(stats);
 
         // Add health
-        PlayerHealth health = new PlayerHealth(100);
+        PlayerHealths health = new PlayerHealths(100);
         player.addComponent(health);
 
         gameScene.addGameObject(player);
@@ -437,58 +436,5 @@ public class MyGame {
         MyGame game = new MyGame();
         game.init();
         game.run();
-    }
-}
-
-class PlayerHealth extends Component {
-    private int maxHealth;
-    private int currentHealth;
-
-    public PlayerHealth(int maxHealth) {
-        this.maxHealth = maxHealth;
-        this.currentHealth = maxHealth;
-    }
-
-    public void takeDamage(int amount) {
-        currentHealth -= amount;
-        if (currentHealth <= 0) {
-            die();
-        }
-
-        // Create damage effect
-        Vector3f position = getGameObject().getTransform().getPosition();
-        createDamageEffect(position);
-    }
-
-    private void die() {
-        // Game over logic
-        System.out.println("Player died!");
-
-        // Restart or show game over screen
-        // SceneManager.getInstance().loadScene("GameOverScene");
-    }
-
-    private void createDamageEffect(Vector3f position) {
-        GameObject effect = new GameObject("DamageEffect");
-        effect.setPosition(position.x, position.y, position.z);
-
-        // Add to scene FIRST
-        SceneManager.getInstance().getActiveScene().addGameObject(effect);
-
-        // THEN add particle system
-        ParticleSystem particles = new ParticleSystem(30);
-        effect.addComponent(particles);
-
-        // Configure particles
-        particles.setEmissionShape(ParticleSystem.EmissionShape.CIRCLE);
-        particles.setEmissionRadius(20);
-        particles.setStartColor(1.0f, 0.0f, 0.0f, 1.0f); // Red color
-        particles.setEndColor(0.8f, 0.0f, 0.0f, 0.0f);
-        particles.setStartSize(5.0f);
-        particles.setEndSize(1.0f);
-        particles.setLifetime(0.5f);
-        particles.setEmissionRate(40); // Use emission rate instead of emit()
-        particles.setDuration(0.5f);
-        particles.setLooping(false);
     }
 }

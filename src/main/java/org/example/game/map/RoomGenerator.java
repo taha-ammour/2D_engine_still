@@ -90,6 +90,9 @@ public class RoomGenerator {
     /**
      * Generate walls around the room
      */
+    /**
+     * Generate walls around the room
+     */
     private void generateWalls() {
         float wallZ = -0.09f; // Walls at same Z level as player
 
@@ -103,8 +106,8 @@ public class RoomGenerator {
         // Top-left corner
         createTile("tile_sp_ul_1", roomStartX, roomStartY, wallZ, true);
 
-        // Top edge
-        for (int x = 1; x < roomWidth * 2 - 1; x++) {
+        // Top edge - fix: use roomWidth - 2 for the correct number of tiles
+        for (int x = 1; x < roomWidth - 1; x++) {
             createTile("tile_up_3u", roomStartX + (x * TILE_SIZE), roomStartY, wallZ, true);
         }
 
@@ -115,21 +118,21 @@ public class RoomGenerator {
         // Bottom-left corner
         createTile("tile_corner_ld_1", roomStartX, roomEndY - TILE_SIZE, wallZ, true);
 
-        // Bottom edge
-        for (int x = 1; x < roomWidth * 2 - 1; x++) {
+        // Bottom edge - fix: use roomWidth - 2 for the correct number of tiles
+        for (int x = 1; x < roomWidth - 1; x++) {
             createTile("tile_down_1", roomStartX + (x * TILE_SIZE), roomEndY - TILE_SIZE, wallZ, true);
         }
 
         // Bottom-right corner
         createTile("tile_corner_rd_1", roomEndX - TILE_SIZE, roomEndY - TILE_SIZE, wallZ, true);
 
-        // LEFT WALL
-        for (int y = 1; y < roomHeight * 2 - 1; y++) {
+        // LEFT WALL - fix: use roomHeight - 2 to account for corners
+        for (int y = 1; y < roomHeight - 1; y++) {
             createTile("tile_l_1", roomStartX, roomStartY + (y * TILE_SIZE), wallZ, true);
         }
 
-        // RIGHT WALL
-        for (int y = 1; y < roomHeight * 2 - 1; y++) {
+        // RIGHT WALL - fix: use roomHeight - 2 to account for corners
+        for (int y = 1; y < roomHeight - 1; y++) {
             createTile("tile_r_1", roomEndX - TILE_SIZE, roomStartY + (y * TILE_SIZE), wallZ, true);
         }
 

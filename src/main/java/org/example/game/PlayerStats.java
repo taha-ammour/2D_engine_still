@@ -7,6 +7,7 @@ import org.example.engine.scene.SceneManager;
 
 /**
  * Manages player statistics like health, coins, etc.
+ * Improved to better integrate with GameUI
  */
 public class PlayerStats extends Component {
     // Player stats
@@ -21,13 +22,31 @@ public class PlayerStats extends Component {
     // Reference to the UI
     private GameUI gameUI;
 
+    // Reference to PlayerHealth component for sync
+    private PlayerHealths healthComponent;
+
     @Override
     protected void onInit() {
+        // Find the PlayerHealth component if available
+        healthComponent = getGameObject().getComponent(PlayerHealths.class);
+        if (healthComponent != null) {
+            System.out.println("PlayerStats: Found PlayerHealth component");
+        }
+
         // Find the game UI
         findGameUI();
 
         // Update UI with initial values
         updateUI();
+    }
+
+    @Override
+    protected void onUpdate(float deltaTime) {
+        // Periodically check if we need to find GameUI again
+        // (in case it wasn't available at init time)
+        if (gameUI == null) {
+            findGameUI();
+        }
     }
 
     /**
@@ -41,6 +60,7 @@ public class PlayerStats extends Component {
                 gameUI = uiContainer.getComponent(GameUI.class);
                 if (gameUI != null) {
                     System.out.println("PlayerStats: Found GameUI component");
+                    updateUI(); // Update UI immediately once found
                 } else {
                     System.out.println("PlayerStats: Found UI container but GameUI component is missing");
                 }
@@ -75,6 +95,11 @@ public class PlayerStats extends Component {
         // Apply damage
         currentHealth = Math.max(0, currentHealth - reducedDamage);
 
+        // Sync with PlayerHealth component if available
+        if (healthComponent != null) {
+            healthComponent.setHealth(currentHealth);
+        }
+
         // Check if player died
         if (currentHealth <= 0) {
             onDeath();
@@ -96,10 +121,20 @@ public class PlayerStats extends Component {
         int previousHealth = currentHealth;
         currentHealth = Math.min(maxHealth, currentHealth + amount);
 
+        // Sync with PlayerHealth component if available
+        if (healthComponent != null) {
+            healthComponent.setHealth(currentHealth);
+        }
+
         int actualHealed = currentHealth - previousHealth;
 
         // Update UI
         updateUI();
+
+        // Show notification if significant healing
+        if (actualHealed > 10 && gameUI != null) {
+            gameUI.showNotification("Healed " + actualHealed + " health!");
+        }
 
         return actualHealed;
     }
@@ -115,6 +150,10 @@ public class PlayerStats extends Component {
             currentEnergy -= amount;
             updateUI();
             return true;
+        }
+
+        if (gameUI != null) {
+            gameUI.showNotification("Not enough energy!");
         }
         return false;
     }
@@ -166,6 +205,10 @@ public class PlayerStats extends Component {
             updateUI();
             return true;
         }
+
+        if (gameUI != null) {
+            gameUI.showNotification("No keys available!");
+        }
         return false;
     }
 
@@ -175,6 +218,10 @@ public class PlayerStats extends Component {
     private void onDeath() {
         // In a real implementation, this would trigger game over logic
         System.out.println("Player died!");
+
+        if (gameUI != null) {
+            gameUI.showNotification("GAME OVER");
+        }
     }
 
     // Getters
@@ -185,4 +232,26 @@ public class PlayerStats extends Component {
     public int getArmor() { return armor; }
     public int getCoins() { return coins; }
     public int getKeys() { return keys; }
+
+    // Setters for syncing with other components
+    public void setHealth(int health) {
+        if (this.currentHealth != health) {
+            this.currentHealth = Math.max(0, Math.min(maxHealth, health));
+            updateUI();
+        }
+    }
+
+    public void setEnergy(int energy) {
+        if (this.currentEnergy != energy) {
+            this.currentEnergy = Math.max(0, Math.min(maxEnergy, energy));
+            updateUI();
+        }
+    }
+
+    public void setArmor(int armor) {
+        if (this.armor != armor) {
+            this.armor = Math.max(0, Math.min(100, armor));
+            updateUI();
+        }
+    }
 }

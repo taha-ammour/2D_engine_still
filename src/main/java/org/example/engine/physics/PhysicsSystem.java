@@ -275,14 +275,17 @@ public class PhysicsSystem {
         //TODO:RN
 
         // Positional correction to prevent sinking
-        Vector2f correction = new Vector2f(collision.normal).mul(collision.depth * 0.8f); // 80% correction
+        // With this corrected code:
+        Vector2f correction = new Vector2f(collision.normal)
+                .mul(-collision.depth * 0.8f); // Note the negative here
 
         Transform transformA = collision.colliderA.getGameObject().getTransform();
         Transform transformB = collision.colliderB.getGameObject().getTransform();
 
+        // Static walls (rbA==null) won't move because ratioA will be 0
         if (rbA == null || !rbA.isKinematic()) {
             Vector3f posA = transformA.getPosition();
-            posA.sub(correction.x * ratioA, correction.y * ratioA, 0);
+            posA.add(correction.x * ratioA, correction.y * ratioA, 0);
             transformA.setPosition(posA);
         }
 
@@ -291,6 +294,7 @@ public class PhysicsSystem {
             posB.add(correction.x * ratioB, correction.y * ratioB, 0);
             transformB.setPosition(posB);
         }
+
 
         // Skip velocity resolution if one object is a trigger
         if (collision.colliderA.isTrigger() || collision.colliderB.isTrigger()) return;

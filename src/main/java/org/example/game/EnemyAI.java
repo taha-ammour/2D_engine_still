@@ -168,7 +168,7 @@ public class EnemyAI extends Component {
         // Handle collision with player (damage, etc.)
         if (collision.colliderB.getGameObject().getName().equals("Player")) {
             // Deal damage to player
-            PlayerHealth playerHealth = player.getComponent(PlayerHealth.class);
+            PlayerHealths playerHealth = player.getComponent(PlayerHealths.class);
             if (playerHealth != null) {
                 playerHealth.takeDamage(10);
             }

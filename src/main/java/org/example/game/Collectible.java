@@ -67,6 +67,13 @@ public class Collectible extends Component {
             } catch (Exception e) {
                 // Silently continue
             }
+            CollectibleManager mgr = new CollectibleManager();
+
+            CollectibleManager.CollectibleType type =
+                    getGameObject().getName().startsWith("Emerald")
+                            ? CollectibleManager.CollectibleType.EMERALD
+                            : CollectibleManager.CollectibleType.SMALL_CHEST;
+            if(mgr!=null) mgr.processCollision(collision, type);
 
             // Create particle effect - use the stored position
             createCollectionEffect(position);
