@@ -16,6 +16,9 @@ public class CameraUIManager extends Component {
     private Vector3f[] relativePositions;
     private Vector3f lastCameraPosition = new Vector3f();
 
+    // Debug flag to log position updates
+    private boolean debugMode = true;
+
     /**
      * Create a new CameraUIManager to keep UI elements fixed to the screen
      * @param uiElements The GameObject array containing all UI elements to manage
@@ -44,11 +47,19 @@ public class CameraUIManager extends Component {
                 for (int i = 0; i < uiElements.length; i++) {
                     if (uiElements[i] != null) {
                         Vector3f elementPos = uiElements[i].getTransform().getPosition();
+
+                        // Store relative to camera
                         relativePositions[i].set(
                                 elementPos.x - lastCameraPosition.x,
                                 elementPos.y - lastCameraPosition.y,
                                 elementPos.z
                         );
+
+                        if (debugMode) {
+                            System.out.println("Initial position for " + uiElements[i].getName() +
+                                    ": " + elementPos.x + ", " + elementPos.y +
+                                    " (relative: " + relativePositions[i].x + ", " + relativePositions[i].y + ")");
+                        }
                     }
                 }
             }
@@ -71,15 +82,24 @@ public class CameraUIManager extends Component {
 
             // Check if camera has moved
             if (!cameraPos.equals(lastCameraPosition)) {
+                if (debugMode) {
+                    System.out.println("Camera moved to: " + cameraPos.x + ", " + cameraPos.y);
+                }
+
                 // Update all UI elements
                 for (int i = 0; i < uiElements.length; i++) {
-                    if (uiElements[i] != null) {
+                    if (uiElements[i] != null && uiElements[i].isActive()) {
                         // Set new position based on relative position from camera
-                        uiElements[i].setPosition(
-                                cameraPos.x + relativePositions[i].x,
-                                cameraPos.y + relativePositions[i].y,
-                                relativePositions[i].z
-                        );
+                        float newX = cameraPos.x + relativePositions[i].x;
+                        float newY = cameraPos.y + relativePositions[i].y;
+                        float newZ = relativePositions[i].z;
+
+                        uiElements[i].setPosition(newX, newY, newZ);
+
+                        if (debugMode) {
+                            System.out.println("Updated " + uiElements[i].getName() +
+                                    " to " + newX + ", " + newY);
+                        }
                     }
                 }
 

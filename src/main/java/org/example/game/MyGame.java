@@ -280,7 +280,8 @@ public class MyGame {
         UISystem uiSystem = UISystem.getInstance();
         uiSystem.init(RenderSystem.getInstance());
         System.out.println("UI System initialized");
-// Create UI container for GameUI
+
+        // Create UI container for GameUI
         GameObject uiContainer = new GameObject("UI_Container");
         uiContainer.setTag("UI"); // Tag for finding it later
         gameScene.addGameObject(uiContainer);
@@ -332,7 +333,7 @@ public class MyGame {
         // Title at top center
         float viewportWidth = 800;
         float viewportHeight = 600;
-        textObj.setPosition(400, 100, 10);  // The CameraUIManager will update this position
+        textObj.setPosition(0, 9, 0);  // The CameraUIManager will update this position
         healthText.setPosition(20, 20, 10);  // Top-left
         scoreText.setPosition(viewportWidth - 150, 20, 10);  // Top-right
     }
