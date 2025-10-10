@@ -1,8 +1,5 @@
 // src/main/java/org/example/mario/states/MarioState.java
-package org.example.mario.states;
-
-import org.example.ecs.components.RigidBody;
-import org.example.mario.MarioController;
+package org.example.game.states;
 
 /**
  * State Pattern: Interface for Mario's states

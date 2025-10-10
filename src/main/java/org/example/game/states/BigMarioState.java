@@ -1,9 +1,9 @@
 
 // src/main/java/org/example/mario/states/BigMarioState.java
-package org.example.mario.states;
+package org.example.game.states;
 
 import org.example.ecs.components.RigidBody;
-import org.example.mario.MarioController;
+import org.example.game.MarioController;
 
 public final class BigMarioState implements MarioState {
     private final MarioController controller;

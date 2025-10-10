@@ -1,10 +1,10 @@
 // src/main/java/org/example/mario/MarioController.java
-package org.example.mario;
+package org.example.game;
 
 import org.example.ecs.Component;
 import org.example.ecs.GameObject;
 import org.example.ecs.components.*;
-import org.example.mario.states.*;
+import org.example.game.states.*;
 import org.example.physics.Collision;
 import org.example.physics.CollisionLayer;
 import org.example.physics.CollisionSystem;

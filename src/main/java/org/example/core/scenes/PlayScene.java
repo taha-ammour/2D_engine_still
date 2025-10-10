@@ -9,7 +9,7 @@ import org.example.gfx.Camera2D;
 import org.example.gfx.Renderer2D;
 import org.example.gfx.Texture;
 import org.example.gfx.TextureAtlas;
-import org.example.mario.MarioController;
+import org.example.game.MarioController;
 import org.example.physics.*;
 import org.joml.Vector2f;
 
