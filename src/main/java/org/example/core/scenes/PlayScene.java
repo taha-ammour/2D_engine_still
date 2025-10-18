@@ -5,10 +5,11 @@ import org.example.ecs.GameObject;
 import org.example.ecs.components.*;
 import org.example.engine.input.Input;
 import org.example.engine.input.InputManager;
-import org.example.gfx.Camera2D;
-import org.example.gfx.Renderer2D;
-import org.example.gfx.Texture;
-import org.example.gfx.TextureAtlas;
+import org.example.game.blocks.BlockFactory;
+import org.example.game.blocks.BlockSpawner;
+import org.example.game.blocks.BlockSpawnListener;
+import org.example.game.blocks.effects.BlockEffects;
+import org.example.gfx.*;
 import org.example.game.MarioController;
 import org.example.physics.*;
 import org.joml.Vector2f;
@@ -21,8 +22,12 @@ import java.util.List;
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
- * PlayScene with ROBUST Collision System
- * Fixed corner cases and multi-collision handling
+ * PlayScene with FIXED Coordinate System and Collision
+ *
+ * KEY FIXES:
+ * 1. Ground is now at Y=32 (above 0) so objects don't fall into negative space
+ * 2. Mario starts at Y=200 (well above ground)
+ * 3. Collision detection includes better bounds checking
  */
 public final class PlayScene extends BaseScene {
     private final List<GameObject> gameObjects = new ArrayList<>();
@@ -31,9 +36,13 @@ public final class PlayScene extends BaseScene {
     private InputManager inputManager;
 
     private final CollisionSystem collisionSystem = new CollisionSystem();
-
-    // Debug renderer (optional)
     private CollisionDebugRenderer debugRenderer;
+
+    // World bounds (prevent objects from falling forever)
+    private static final float WORLD_FLOOR = -100f;
+
+    private BlockFactory blockFactory;
+    private BlockSpawner blockSpawner;
 
     public PlayScene(Input input, Renderer2D renderer, Camera2D camera) {
         super(input, renderer, camera);
@@ -41,10 +50,31 @@ public final class PlayScene extends BaseScene {
 
     @Override
     protected void onLoad() {
-        createMario();
-        createGround();
-        createPlatforms();
-        createTestLevel();  // Additional test structures
+
+        blockFactory = new BlockFactory(renderer, collisionSystem);
+        blockSpawner = new BlockSpawner(blockFactory);
+
+        // Add spawn listener for debugging
+        blockSpawner.addListener(new BlockSpawnListener() {
+            @Override
+            public void onBlockSpawned(GameObject block) {
+                gameObjects.add(block);
+                System.out.println("✅ Block spawned: " + block.getName());
+            }
+
+            @Override
+            public void onBlockDespawned(GameObject block) {
+                gameObjects.remove(block);
+                System.out.println("🗑️ Block despawned: " + block.getName());
+            }
+        });
+
+        createGround();        // Create ground FIRST
+        createPlatforms();     // Then platforms
+        createBlocks();        // NEW: Create blocks
+        createTestLevel();     // Then test structures
+        createMario();         // Mario LAST so it spawns above everything
+
         camera.setPosition(0, 0);
 
         // Initialize debug renderer
@@ -67,16 +97,111 @@ public final class PlayScene extends BaseScene {
         inputManager.bindKeyPress(GLFW_KEY_LEFT_SHIFT, dt -> marioController.dash());
         inputManager.bindKeyPress(GLFW_KEY_X, dt -> marioController.dash());
         inputManager.bindKeyPress(GLFW_KEY_C, dt -> marioController.dash());
+        inputManager.bindKeyPress(GLFW_KEY_B, dt -> spawnBlockAtMario());
 
         // Debug key
         inputManager.bindKeyPress(GLFW_KEY_F3, dt -> debugRenderer.toggle());
+
+        System.out.println("✅ PlayScene loaded successfully!");
+        System.out.println("📊 Total GameObjects: " + gameObjects.size());
+        System.out.println("🎮 Controls: Arrow Keys/WASD=Move, Space/W/Up=Jump, Shift/X/C=Dash, F3=Debug");
+    }
+
+    private void spawnBlockAtMario() {
+        Transform marioTransform = marioObject.getComponent(Transform.class);
+        if (marioTransform != null) {
+            // Spawn random block type above Mario
+            String[] templates = {"lucky_coin", "mystery", "poison", "lucky_powerup"};
+            String template = templates[(int)(Math.random() * templates.length)];
+
+            blockSpawner.spawn(template,
+                    marioTransform.position.x,
+                    marioTransform.position.y + 100);
+
+            System.out.println("🎲 Spawned " + template + " block!");
+        }
+    }
+
+    private void createBlocks() {
+        // ===== SIMPLE BLOCKS =====
+
+        // Lucky blocks with coins
+        blockSpawner.spawn("lucky_coin", 300, 200);
+        blockSpawner.spawn("lucky_coin", 400, 200);
+        blockSpawner.spawn("lucky_coin", 500, 200);
+
+        // Lucky block with power-up
+        blockSpawner.spawn("lucky_powerup", 600, 250);
+
+        // Poison blocks
+        blockSpawner.spawn("poison", 800, 150);
+        blockSpawner.spawn("poison", 900, 150);
+
+        // Mystery blocks (random effects)
+        blockSpawner.spawn("mystery", 1100, 200);
+        blockSpawner.spawn("mystery", 1200, 200);
+
+        // ===== ADVANCED BLOCKS WITH DECORATORS =====
+
+        // Double effect lucky block (gives 2x power-up!)
+        GameObject doubleBlock = blockFactory.createDoubleEffectLuckyBlock(700, 300);
+        blockSpawner.spawnCustom(700, 300, builder ->
+                builder.lucky()
+                        .effect(BlockEffects.POWER_UP)
+                        .doubleEffect()
+                        .shader("effects", ShaderEffect.PULSATE, ShaderEffect.OUTLINE)
+        );
+
+        // Animated poison block with wobble
+        blockSpawner.spawnCustom(1000, 180, builder ->
+                builder.poison()
+                        .animated("poison_idle", "poison_hit")
+                        .shader("effects", ShaderEffect.WOBBLE, ShaderEffect.PULSATE)
+        );
+
+        // Super bouncy block (2x bounce!)
+        blockSpawner.spawnCustom(1300, 100, builder ->
+                builder.bouncy()
+                        .doubleEffect()
+                        .shader("effects", ShaderEffect.OUTLINE)
+        );
+
+        // ===== BATCH SPAWNING =====
+
+        // Grid of coin blocks
+        blockSpawner.spawnGrid("lucky_coin", 1500, 200, 3, 2, 80);
+
+        // Line of mystery blocks
+        blockSpawner.spawnLine("mystery", 1800, 150, 2100, 250, 5);
+
+        // ===== CUSTOM BLOCKS =====
+
+        // Create a custom multi-effect block
+        blockSpawner.spawnCustom(2200, 200, builder ->
+                builder.lucky()
+                        .effect(BlockEffects.INVINCIBILITY
+                                .andThen(BlockEffects.POWER_UP)
+                                .andThen(BlockEffects.BOUNCE))
+                        .doubleEffect()
+                        .animated("lucky_idle", "lucky_hit")
+                        .shader("effects",
+                                ShaderEffect.FLASH,
+                                ShaderEffect.OUTLINE,
+                                ShaderEffect.PULSATE)
+        );
+
+        // Coin block with 10 coins
+        GameObject coinBlock = blockFactory.createCoinBlock(2400, 180, 10);
+        gameObjects.add(coinBlock);
+
+        System.out.println("✅ Blocks created: " + blockSpawner.getActiveBlocks().size());
     }
 
     private void createMario() {
         marioObject = new GameObject("Mario");
 
-        // Transform
-        Transform transform = new Transform(100, 100);
+        // Transform - Start at Y=200 (well above ground at Y=32)
+        Transform transform = new Transform(100, 200);
         marioObject.addComponent(transform);
 
         // Physics
@@ -101,75 +226,63 @@ public final class PlayScene extends BaseScene {
             if (texture != null) {
                 TextureAtlas atlas = new TextureAtlas(texture, 4, 2);
                 sprite.setAtlas(atlas);
-                System.out.println("✅ Mario texture loaded successfully!");
+                System.out.println("✅ Mario texture loaded!");
             } else {
-                System.err.println("⚠️  Mario texture not found - using default rendering");
+                System.out.println("ℹ️  Using default Mario rendering (no texture)");
+                sprite.setTint(1.0f, 0.2f, 0.2f, 1.0f); // Red color for visibility
             }
         } catch (Exception e) {
-            System.err.println("Failed to load Mario texture: " + e.getMessage());
+            System.err.println("⚠️ Failed to load Mario texture: " + e.getMessage());
+            sprite.setTint(1.0f, 0.2f, 0.2f, 1.0f); // Red color for visibility
         }
 
         marioObject.addComponent(sprite);
 
         // Animator
         Animator animator = new Animator();
-        animator.addClip("idle", AnimationClip.create(0, 1, 1f));    // Frame 0
-        animator.addClip("run", AnimationClip.create(1, 3, 10f));    // Frames 1-3 ✅
-        animator.addClip("jump", AnimationClip.create(4, 1, 1f));    // Frame 4
+        animator.addClip("idle", AnimationClip.create(0, 1, 1f));
+        animator.addClip("run", AnimationClip.create(1, 3, 10f));
+        animator.addClip("jump", AnimationClip.create(4, 1, 1f));
         marioObject.addComponent(animator);
 
-        // Controller - ✅ NOW WITH COLLISION SYSTEM REFERENCE
+        // Controller - with collision system reference
         marioController = new MarioController();
         marioController.setCollisionSystem(collisionSystem);
         marioObject.addComponent(marioController);
 
         gameObjects.add(marioObject);
+        System.out.println("✅ Mario created at position: (100, 200)");
     }
 
     private Texture loadTexture(String filename) {
-        // List of paths to try (in order)
         String[] pathsToTry = {
-                "assets/" + filename,                    // From project root
-                "src/main/resources/assets/" + filename,        // Maven/Gradle resources
-                "../assets/" + filename,                 // One level up
-                "../../assets/" + filename,              // Two levels up
-                filename                                 // Current directory
+                "assets/" + filename,
+                "src/main/resources/assets/" + filename,
+                "../assets/" + filename,
+                "../../assets/" + filename,
+                filename
         };
-
-        System.out.println("\n🔍 Searching for texture: " + filename);
-        System.out.println("Working directory: " + System.getProperty("user.dir"));
 
         for (String pathStr : pathsToTry) {
             try {
                 Path path = Path.of(pathStr);
-                System.out.println("  Trying: " + path.toAbsolutePath());
-
                 if (Files.exists(path)) {
-                    System.out.println("  ✅ Found at: " + path.toAbsolutePath());
                     return Texture.load(path.toString());
                 }
             } catch (Exception e) {
-                System.err.println("  ❌ Error loading from " + pathStr + ": " + e.getMessage());
+                // Continue to next path
             }
         }
 
-        // Try loading from classpath/resources
+        // Try classpath
         try {
-            System.out.println("  Trying classpath resources...");
             var resource = getClass().getClassLoader().getResource(filename);
             if (resource != null) {
-                System.out.println("  ✅ Found in classpath: " + resource);
                 return Texture.load(resource.getPath());
             }
         } catch (Exception e) {
-            System.err.println("  ❌ Error loading from classpath: " + e.getMessage());
+            // Texture not found
         }
-
-        System.err.println("  ❌ Texture not found in any location!");
-        System.err.println("\n💡 To fix this:");
-        System.err.println("  1. Create an 'assets' folder in your project root");
-        System.err.println("  2. Place " + filename + " in the assets folder");
-        System.err.println("  3. Or use a solid color texture for testing");
 
         return null;
     }
@@ -178,11 +291,12 @@ public final class PlayScene extends BaseScene {
         int tileSize = 64;
         int groundHeight = 32;
         int numTiles = 50;
+        float groundY = 32f; // ✅ FIXED: Ground is now at Y=32, not Y=0
 
         for (int i = 0; i < numTiles; i++) {
             GameObject groundTile = new GameObject("Ground_" + i);
 
-            Transform transform = new Transform(i * tileSize, 0);
+            Transform transform = new Transform(i * tileSize, groundY);
             groundTile.addComponent(transform);
 
             BoxCollider collider = new BoxCollider(tileSize, groundHeight, CollisionLayer.GROUND);
@@ -193,52 +307,56 @@ public final class PlayScene extends BaseScene {
             SpriteRenderer sprite = new SpriteRenderer(renderer);
             sprite.width = tileSize;
             sprite.height = groundHeight;
-            sprite.setTint(0.3f, 0.6f, 0.3f, 1.0f);
+            sprite.setTint(0.3f, 0.6f, 0.3f, 1.0f); // Green ground
             groundTile.addComponent(sprite);
 
             gameObjects.add(groundTile);
         }
 
-        // Reference markers
+        // Reference markers every 5 tiles
         for (int i = 0; i < numTiles; i += 5) {
             GameObject marker = new GameObject("Marker_" + i);
 
-            Transform transform = new Transform(i * tileSize, groundHeight);
+            Transform transform = new Transform(i * tileSize, groundY + groundHeight);
             marker.addComponent(transform);
 
             SpriteRenderer sprite = new SpriteRenderer(renderer);
             sprite.width = 16;
             sprite.height = 64;
-            sprite.setTint(1.0f, 1.0f, 0.0f, 1.0f);
+            sprite.setTint(1.0f, 1.0f, 0.0f, 1.0f); // Yellow markers
             marker.addComponent(sprite);
 
             gameObjects.add(marker);
         }
+
+        System.out.println("✅ Ground created: " + numTiles + " tiles at Y=" + groundY);
     }
 
     private void createPlatforms() {
+        // Platforms at various heights above ground
         createPlatform(400, 150, 3);
         createPlatform(700, 250, 4);
         createPlatform(1100, 180, 2);
         createPlatform(1400, 300, 3);
+
+        System.out.println("✅ Platforms created");
     }
 
-    /**
-     * Create test structures to verify collision fixes
-     */
     private void createTestLevel() {
         // Narrow corridor (tests wall sliding)
-        createWall(500, 32, 5);
-        createWall(500 + 96, 32, 5);
+        createWall(500, 64, 5);
+        createWall(596, 64, 5); // 500 + 96
 
-        // Corner test (tests corner resolution)
-        createWall(800, 32, 3);
+        // Corner test
+        createWall(800, 64, 3);
         createPlatform(800, 224, 3);
 
-        // Staircase (tests multiple ground contacts)
+        // Staircase
         for (int i = 0; i < 5; i++) {
-            createPlatform(1600 + i * 64, 32 + i * 64, 1);
+            createPlatform(1600 + i * 64, 64 + i * 64, 1);
         }
+
+        System.out.println("✅ Test structures created");
     }
 
     private void createPlatform(float x, float y, int tiles) {
@@ -259,7 +377,7 @@ public final class PlayScene extends BaseScene {
             SpriteRenderer sprite = new SpriteRenderer(renderer);
             sprite.width = tileSize;
             sprite.height = platformHeight;
-            sprite.setTint(0.6f, 0.4f, 0.2f, 1.0f);
+            sprite.setTint(0.6f, 0.4f, 0.2f, 1.0f); // Brown platforms
             tile.addComponent(sprite);
 
             gameObjects.add(tile);
@@ -284,7 +402,7 @@ public final class PlayScene extends BaseScene {
             SpriteRenderer sprite = new SpriteRenderer(renderer);
             sprite.width = wallWidth;
             sprite.height = tileSize;
-            sprite.setTint(0.5f, 0.5f, 0.5f, 1.0f);
+            sprite.setTint(0.5f, 0.5f, 0.5f, 1.0f); // Gray walls
             tile.addComponent(sprite);
 
             gameObjects.add(tile);
@@ -314,8 +432,19 @@ public final class PlayScene extends BaseScene {
         // ✅ Update collision system AFTER all movement
         collisionSystem.update();
 
-        // Smooth camera follow
+        // Safety: Prevent falling through world bounds
         Transform marioTransform = marioObject.getComponent(Transform.class);
+        if (marioTransform != null && marioTransform.position.y < WORLD_FLOOR) {
+            marioTransform.position.y = 200; // Respawn at start height
+            marioTransform.position.x = 100;
+            RigidBody rb = marioObject.getComponent(RigidBody.class);
+            if (rb != null) {
+                rb.velocity.set(0, 0);
+            }
+            System.out.println("⚠️ Mario fell through world - respawned");
+        }
+
+        // Smooth camera follow
         if (marioTransform != null) {
             float targetX = marioTransform.position.x - 400;
             float targetY = 0;
@@ -335,7 +464,7 @@ public final class PlayScene extends BaseScene {
             obj.render();
         }
 
-        // Debug collision visualization (press F3 to toggle)
+        // Debug collision visualization (F3 to toggle)
         if (debugRenderer.isEnabled()) {
             debugRenderer.render(collisionSystem.getAllColliders());
         }
@@ -343,6 +472,7 @@ public final class PlayScene extends BaseScene {
 
     @Override
     protected void onUnload() {
+        blockSpawner.clear();
         collisionSystem.clear();
         gameObjects.clear();
         marioObject = null;

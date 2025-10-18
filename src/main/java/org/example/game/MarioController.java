@@ -1,4 +1,4 @@
-// src/main/java/org/example/mario/MarioController.java
+// src/main/java/org/example/game/MarioController.java
 package org.example.game;
 
 import org.example.ecs.Component;
@@ -9,13 +9,18 @@ import org.example.physics.Collision;
 import org.example.physics.CollisionLayer;
 import org.example.physics.CollisionSystem;
 import org.example.physics.ICollisionListener;
+import org.example.physics.BoxCollider;
 
 import java.util.HashSet;
 import java.util.Set;
 
 /**
  * Mario Controller with ROBUST ground detection
- * Combines collision callbacks with active ground checking
+ *
+ * KEY FIXES:
+ * 1. Better ground detection with proper offset calculation
+ * 2. Improved collision tracking
+ * 3. More reliable coyote time
  */
 public final class MarioController extends Component implements ICollisionListener {
     private MarioState currentState;
@@ -46,7 +51,7 @@ public final class MarioController extends Component implements ICollisionListen
     private boolean wasGroundedLastFrame = false;
     private float timeSinceGrounded = 0f;
 
-    // Collision system reference for ground checks
+    // Collision system reference
     private CollisionSystem collisionSystem;
 
     // Dash mechanic
@@ -177,7 +182,8 @@ public final class MarioController extends Component implements ICollisionListen
 
     /**
      * ROBUST ground check - uses both collision tracking AND active overlap check
-     * This prevents bugs where collision callbacks get out of sync
+     *
+     * ✅ FIXED: Better offset calculation based on collider dimensions
      */
     private boolean checkGrounded() {
         // First check: collision tracking
@@ -185,21 +191,26 @@ public final class MarioController extends Component implements ICollisionListen
             return true;
         }
 
-        // Second check: active ground detection (small overlap box below player)
-        // This catches cases where collision callbacks might be missed
+        // Second check: active ground detection
         if (collisionSystem != null) {
             Transform transform = owner.getComponent(Transform.class);
-            if (transform != null) {
-                // Check a small area just below the player's feet
-                float groundCheckDistance = 2f;
-                float checkX = transform.position.x + 14; // Center of 28-wide collider
-                float checkY = transform.position.y - groundCheckDistance;
+            BoxCollider selfCollider = owner.getComponent(BoxCollider.class);
+
+            if (transform != null && selfCollider != null) {
+                // Calculate check position at bottom of collider
+                float groundCheckDistance = 3f;
+
+                // Center X of collider (accounting for offset)
+                float checkX = transform.position.x + selfCollider.offset.x + selfCollider.width * 0.5f;
+
+                // Bottom Y of collider minus check distance
+                float checkY = transform.position.y + selfCollider.offset.y - groundCheckDistance;
 
                 var groundColliders = collisionSystem.overlapBox(
                         checkX,
                         checkY,
-                        20f,  // Slightly narrower than player
-                        4f,   // Small height
+                        selfCollider.width * 0.8f,  // Slightly narrower
+                        6f,                          // Small height
                         CollisionLayer.GROUND,
                         CollisionLayer.PLATFORM
                 );
