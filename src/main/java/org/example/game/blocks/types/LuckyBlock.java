@@ -35,6 +35,11 @@ public final class LuckyBlock extends Block {
     }
 
     @Override
+    public BlockEffect getEffect() {
+        return effect;
+    }
+
+    @Override
     public void setupVisuals() {
         SpriteRenderer sprite = new SpriteRenderer(renderer);
         sprite.width = 64;
@@ -99,7 +104,11 @@ public final class LuckyBlock extends Block {
     @Override
     public void onHit(GameObject player) {
         state = BlockState.HIT;
-        effect.apply(player);
+
+        BlockEffect effect = getEffect();
+        if (effect != null) {
+            effect.apply(player);
+        }
 
         SpriteRenderer sprite = owner.getComponent(SpriteRenderer.class);
         if (sprite != null) {

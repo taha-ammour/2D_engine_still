@@ -9,6 +9,7 @@ package org.example.game.blocks;
 import org.example.ecs.Component;
 import org.example.ecs.GameObject;
 import org.example.ecs.components.SpriteRenderer;
+import org.example.game.blocks.effects.BlockEffect;
 import org.example.gfx.*;
 import org.example.physics.*;
 
@@ -41,6 +42,10 @@ public abstract class Block extends Component implements ICollisionListener {
                 .shader("sprite")
                 .tint(1, 1, 1, 1)
                 .build();
+    }
+
+    public BlockEffect getEffect() {
+        return null;  // Default: no effect
     }
 
     @Override
@@ -131,6 +136,21 @@ public abstract class Block extends Component implements ICollisionListener {
     public boolean isActive() { return isActive; }
     public Material getMaterial() { return material; }
 
+    public void setState(BlockState state) {
+        this.state = state;
+    }
+
+    public int getMaxHits() {
+        return maxHits;
+    }
+
+    public boolean getCanBeHit() {
+        return canBeHit;
+    }
+
+    public boolean getIsBreakable() {
+        return isBreakable;
+    }
 
 }
 

@@ -26,7 +26,7 @@ public final class MysteryBlock extends Block {
     public MysteryBlock() {
         super();
         this.canBeHit = true;
-        this.maxHits = 5;
+        this.maxHits = 1;  // ✅ Only one use
     }
 
     @Override
@@ -82,11 +82,17 @@ public final class MysteryBlock extends Block {
     }
 
     @Override
+    public BlockEffect getEffect() {
+        return BlockEffects.random(POSSIBLE_EFFECTS);
+    }
+
+    @Override
     public void onHit(GameObject player) {
         state = BlockState.HIT;
-        int index = (int) (Math.random() * POSSIBLE_EFFECTS.length);
-        POSSIBLE_EFFECTS[index].apply(player);
-        System.out.println("❓ Mystery block - random effect!");
+
+        BlockEffect effect = getEffect();
+        effect.apply(player);
+
     }
 
     @Override

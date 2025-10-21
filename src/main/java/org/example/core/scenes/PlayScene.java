@@ -9,6 +9,7 @@ import org.example.game.blocks.BlockFactory;
 import org.example.game.blocks.BlockSpawner;
 import org.example.game.blocks.BlockSpawnListener;
 import org.example.game.blocks.effects.BlockEffects;
+import org.example.game.blocks.types.BouncyBlock;
 import org.example.gfx.*;
 import org.example.game.MarioController;
 import org.example.physics.*;
