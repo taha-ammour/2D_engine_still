@@ -3,6 +3,7 @@ package org.example.core.scenes;
 
 import org.example.ecs.GameObject;
 import org.example.ecs.components.*;
+import org.example.effects.*;
 import org.example.engine.input.Input;
 import org.example.engine.input.InputManager;
 import org.example.game.blocks.BlockFactory;
@@ -12,6 +13,10 @@ import org.example.game.blocks.effects.BlockEffects;
 import org.example.game.blocks.types.BouncyBlock;
 import org.example.gfx.*;
 import org.example.game.MarioController;
+import org.example.gfx.particles.ParticleConfig;
+import org.example.gfx.particles.ParticleRenderer;
+import org.example.gfx.particles.ParticleSystem;
+import org.example.gfx.postprocess.BloomEffect;
 import org.example.physics.*;
 import org.joml.Vector2f;
 
@@ -21,6 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.glClear;
 
 /**
  * PlayScene with FIXED Coordinate System and Collision
@@ -45,6 +52,21 @@ public final class PlayScene extends BaseScene {
     private BlockFactory blockFactory;
     private BlockSpawner blockSpawner;
 
+    // ✨ VISUAL EFFECTS SYSTEMS
+    private ParticleSystem particleSystem;
+    private ParticleRenderer particleRenderer;
+    private FluidSystem fluidSystem;
+    private FluidRenderer fluidRenderer;
+    private ScreenShake screenShake;
+    private TrailRenderer trailRenderer;
+    private TrailRenderer.Trail marioTrail;
+
+    // Bloom effect (optional but cool!)
+    private BloomEffect bloomEffect;
+    private Framebuffer sceneBuffer;
+    private boolean bloomEnabled = true;
+
+
     public PlayScene(Input input, Renderer2D renderer, Camera2D camera) {
         super(input, renderer, camera);
     }
@@ -54,6 +76,36 @@ public final class PlayScene extends BaseScene {
 
         blockFactory = new BlockFactory(renderer, collisionSystem);
         blockSpawner = new BlockSpawner(blockFactory);
+
+        // ✨ Initialize particle system
+        particleSystem = new ParticleSystem();
+        particleRenderer = new ParticleRenderer(renderer, particleSystem);
+
+        // ✨ Initialize fluid system
+        fluidSystem = new FluidSystem(500);
+        fluidSystem.setBounds(0, 0, 3200, 720);
+        fluidRenderer = new FluidRenderer(renderer, fluidSystem);
+
+        // ✨ Initialize screen shake
+        screenShake = new ScreenShake(camera);
+        screenShake.setMaxOffset(12f);
+        screenShake.setDecayRate(2.0f);
+
+        // ✨ Initialize trail renderer
+        trailRenderer = new TrailRenderer(renderer);
+
+        // ✨ Initialize bloom (optional)
+        try {
+            sceneBuffer = new Framebuffer(1280, 720);
+            bloomEffect = new BloomEffect(1280, 720);
+            bloomEffect.setThreshold(0.6f);
+            bloomEffect.setIntensity(0.7f);
+            bloomEffect.setBlurPasses(3);
+        } catch (Exception e) {
+            System.err.println("⚠️  Bloom not available (non-critical): " + e.getMessage());
+            bloomEnabled = false;
+        }
+
 
         // Add spawn listener for debugging
         blockSpawner.addListener(new BlockSpawnListener() {
@@ -100,8 +152,21 @@ public final class PlayScene extends BaseScene {
         inputManager.bindKeyPress(GLFW_KEY_C, dt -> marioController.dash());
         inputManager.bindKeyPress(GLFW_KEY_B, dt -> spawnBlockAtMario());
 
+        // Effect tests
+        inputManager.bindKeyPress(GLFW_KEY_1, dt -> testJumpEffect());
+        inputManager.bindKeyPress(GLFW_KEY_2, dt -> testWaterSplash());
+        inputManager.bindKeyPress(GLFW_KEY_3, dt -> testLavaBurst());
+        inputManager.bindKeyPress(GLFW_KEY_4, dt -> testExplosion());
+        inputManager.bindKeyPress(GLFW_KEY_5, dt -> testMagicSparkles());
+
+
         // Debug key
         inputManager.bindKeyPress(GLFW_KEY_F3, dt -> debugRenderer.toggle());
+        inputManager.bindKeyPress(GLFW_KEY_F4, dt -> {
+            bloomEnabled = !bloomEnabled;
+            System.out.println("✨ Bloom: " + (bloomEnabled ? "ON" : "OFF"));
+        });
+        inputManager.bindKeyPress(GLFW_KEY_F5, dt -> clearAllEffects());
 
         System.out.println("✅ PlayScene loaded successfully!");
         System.out.println("📊 Total GameObjects: " + gameObjects.size());
@@ -118,6 +183,14 @@ public final class PlayScene extends BaseScene {
             blockSpawner.spawn(template,
                     marioTransform.position.x,
                     marioTransform.position.y + 100);
+
+            particleSystem.emitBurst(
+                    marioTransform.position.x,
+                    marioTransform.position.y + 100,
+                    15,
+                    ParticleConfig.powerUpGlow()
+            );
+            screenShake.shakeLight();
 
             System.out.println("🎲 Spawned " + template + " block!");
         }
@@ -247,7 +320,10 @@ public final class PlayScene extends BaseScene {
         marioObject.addComponent(animator);
 
         // Controller - with collision system reference
-        marioController = new MarioController();
+        marioController = new MarioController(particleSystem,
+                fluidSystem,
+                screenShake,
+                trailRenderer);
         marioController.setCollisionSystem(collisionSystem);
         marioObject.addComponent(marioController);
 
@@ -433,6 +509,12 @@ public final class PlayScene extends BaseScene {
         // ✅ Update collision system AFTER all movement
         collisionSystem.update();
 
+        // ✨ Update all visual effects
+        particleSystem.update((float)dt);
+        fluidSystem.update((float)dt);
+        screenShake.update((float)dt);
+        trailRenderer.update((float)dt);
+
         // Safety: Prevent falling through world bounds
         Transform marioTransform = marioObject.getComponent(Transform.class);
         if (marioTransform != null && marioTransform.position.y < WORLD_FLOOR) {
@@ -461,13 +543,29 @@ public final class PlayScene extends BaseScene {
 
     @Override
     public void render() {
+        if (bloomEnabled && sceneBuffer != null) {
+            sceneBuffer.bind();
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
         for (GameObject obj : gameObjects) {
             obj.render();
         }
 
+        // ✨ Render all visual effects
+        fluidRenderer.render();      // Fluids first (background)
+        particleRenderer.render();   // Particles on top
+        trailRenderer.render();      // Trails on top
+
+
         // Debug collision visualization (F3 to toggle)
         if (debugRenderer.isEnabled()) {
             debugRenderer.render(collisionSystem.getAllColliders());
+        }
+
+        // Apply bloom
+        if (bloomEnabled && sceneBuffer != null && bloomEffect != null) {
+            bloomEffect.apply(sceneBuffer.getColorTexture(), 1280, 720);
         }
     }
 
@@ -476,8 +574,74 @@ public final class PlayScene extends BaseScene {
         blockSpawner.clear();
         collisionSystem.clear();
         gameObjects.clear();
+
+        // ✨ Cleanup effects
+        particleSystem.clear();
+        fluidSystem.clear();
+        screenShake.stop();
+
+        if (bloomEffect != null) bloomEffect.close();
+        if (sceneBuffer != null) sceneBuffer.close();
+
         marioObject = null;
         marioController = null;
         inputManager = null;
     }
+
+    // ✨ EFFECT TEST METHODS
+    private void testJumpEffect() {
+        Transform t = marioObject.getComponent(Transform.class);
+        if (t != null) {
+            particleSystem.emitBurst(t.position.x + 16, t.position.y, 20, ParticleConfig.jumpDust());
+            screenShake.shakeLight();
+            System.out.println("✨ Jump effect!");
+        }
+    }
+
+    private void testWaterSplash() {
+        Transform t = marioObject.getComponent(Transform.class);
+        if (t != null) {
+            fluidSystem.emitFluid(t.position.x, t.position.y - 20, 60, FluidConfig.water());
+            particleSystem.emitBurst(t.position.x, t.position.y, 15, ParticleConfig.coinCollect());
+            System.out.println("💧 Water splash!");
+        }
+    }
+
+    private void testLavaBurst() {
+        Transform t = marioObject.getComponent(Transform.class);
+        if (t != null) {
+            fluidSystem.emitFluid(t.position.x, t.position.y, 40, FluidConfig.lava());
+            particleSystem.emitBurst(t.position.x, t.position.y + 20, 25, ParticleConfig.wallSlide());
+            screenShake.shakeMedium();
+            System.out.println("🔥 Lava burst!");
+        }
+    }
+
+    private void testExplosion() {
+        Transform t = marioObject.getComponent(Transform.class);
+        if (t != null) {
+            particleSystem.emitBurst(t.position.x, t.position.y, 80, ParticleConfig.blockHit());
+            fluidSystem.emitFluid(t.position.x, t.position.y, 50, FluidConfig.sparks());
+            screenShake.shakeHeavy();
+            System.out.println("💥 EXPLOSION!");
+        }
+    }
+
+    private void testMagicSparkles() {
+        Transform t = marioObject.getComponent(Transform.class);
+        if (t != null) {
+            particleSystem.emitBurst(t.position.x, t.position.y + 24, 40, ParticleConfig.powerUpGlow());
+            fluidSystem.emitFluid(t.position.x, t.position.y + 30, 20, FluidConfig.magic());
+            System.out.println("✨ Magic sparkles!");
+        }
+    }
+
+    private void clearAllEffects() {
+        particleSystem.clear();
+        fluidSystem.clear();
+        screenShake.stop();
+        System.out.println("🧹 All effects cleared!");
+    }
+
+
 }

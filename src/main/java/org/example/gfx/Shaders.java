@@ -1,6 +1,7 @@
 package org.example.gfx;
 
 public final class Shaders {
+
     private Shaders() {}
 
     // ============================================
@@ -352,6 +353,49 @@ public final class Shaders {
         }
         
         FragColor = color;
+    }
+    """;
+
+    public static final String BLOOM_EXTRACT_FRAG = """
+    #version 330 core
+    in vec2 vUV;
+    out vec4 FragColor;
+    
+    uniform sampler2D uTexture;
+    uniform float uThreshold;
+    
+    void main() {
+        vec4 color = texture(uTexture, vUV);
+        
+        // Calculate brightness
+        float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+        
+        // Only keep colors above threshold (bright parts)
+        if (brightness > uThreshold) {
+            FragColor = color;
+        } else {
+            FragColor = vec4(0.0);
+        }
+    }
+    """;
+
+    public static final String BLOOM_COMBINE_FRAG = """
+    #version 330 core
+    in vec2 vUV;
+    out vec4 FragColor;
+    
+    uniform sampler2D uScene;
+    uniform sampler2D uBloom;
+    uniform float uBloomIntensity;
+    
+    void main() {
+        vec3 scene = texture(uScene, vUV).rgb;
+        vec3 bloom = texture(uBloom, vUV).rgb;
+        
+        // Combine original scene with blurred bright parts
+        vec3 result = scene + bloom * uBloomIntensity;
+        
+        FragColor = vec4(result, 1.0);
     }
     """;
 }

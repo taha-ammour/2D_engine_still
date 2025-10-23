@@ -4,7 +4,12 @@ package org.example.game;
 import org.example.ecs.Component;
 import org.example.ecs.GameObject;
 import org.example.ecs.components.*;
+import org.example.effects.FluidSystem;
+import org.example.effects.ScreenShake;
+import org.example.effects.TrailRenderer;
 import org.example.game.states.*;
+import org.example.gfx.particles.ParticleConfig;
+import org.example.gfx.particles.ParticleSystem;
 import org.example.physics.Collision;
 import org.example.physics.CollisionLayer;
 import org.example.physics.CollisionSystem;
@@ -54,6 +59,12 @@ public final class MarioController extends Component implements ICollisionListen
     // Collision system reference
     private CollisionSystem collisionSystem;
 
+    // ✨ PARTICLE SYSTEM ✨
+    private ParticleSystem particleSystem;
+    private float dashTrailTimer = 0f;
+    private float wallSlideTimer = 0f;
+
+
     // Dash mechanic
     private boolean canDash = true;
     private boolean isDashing = false;
@@ -65,6 +76,12 @@ public final class MarioController extends Component implements ICollisionListen
     private float dashDirX = 0f;
     private float dashDirY = 0f;
 
+    public MarioController(ParticleSystem particleSystem, FluidSystem fluidSystem, ScreenShake screenShake, TrailRenderer trailRenderer) {
+        super();
+        this.particleSystem = particleSystem;
+
+    }
+
     public void setCollisionSystem(CollisionSystem collisionSystem) {
         this.collisionSystem = collisionSystem;
     }
@@ -75,6 +92,12 @@ public final class MarioController extends Component implements ICollisionListen
         bigState = new BigMarioState(this);
         currentState = smallState;
     }
+
+    // ✨ NEW: Set particle system
+    public void setParticleSystem(ParticleSystem particleSystem) {
+        this.particleSystem = particleSystem;
+    }
+
 
     @Override
     public void update(double dt) {
@@ -92,7 +115,7 @@ public final class MarioController extends Component implements ICollisionListen
 
         // Detect landing
         if (isGrounded && !wasGroundedLastFrame) {
-            onLanded();
+            onLanded(transform);
         }
 
         wasGroundedLastFrame = isGrounded;
@@ -100,6 +123,15 @@ public final class MarioController extends Component implements ICollisionListen
         // Update dash cooldown
         if (dashCooldownTimer > 0) {
             dashCooldownTimer -= (float)dt;
+        }
+
+        // ✨ Dash trail particles
+        if (isDashing && particleSystem != null) {
+            dashTrailTimer += (float)dt;
+            if (dashTrailTimer > 0.03f) { // Emit every 30ms
+                emitDashTrail(transform);
+                dashTrailTimer = 0f;
+            }
         }
 
         // Dash logic
@@ -124,7 +156,7 @@ public final class MarioController extends Component implements ICollisionListen
 
         // Start dash
         if (dashRequested && canDash && dashCooldownTimer <= 0) {
-            startDash();
+            startDash(transform);
             dashRequested = false;
             return;
         }
@@ -163,6 +195,9 @@ public final class MarioController extends Component implements ICollisionListen
             jumpBufferCounter = 0;
             coyoteCounter = 0;
             isJumping = true;
+
+            emitJumpDust(transform);
+
         }
 
         // Variable jump height
@@ -178,6 +213,28 @@ public final class MarioController extends Component implements ICollisionListen
         moveRight = false;
         jumpRequested = false;
         dashRequested = false;
+    }
+
+    private void emitJumpDust(Transform transform) {
+        if (particleSystem != null) {
+            particleSystem.emitBurst(
+                    transform.position.x + 16,
+                    transform.position.y,
+                    8,
+                    ParticleConfig.jumpDust()
+            );
+        }
+    }
+
+    private void emitDashTrail(Transform transform) {
+        if (particleSystem != null) {
+            particleSystem.emitBurst(
+                    transform.position.x + 16,
+                    transform.position.y + 24,
+                    3,
+                    ParticleConfig.dashTrail()
+            );
+        }
     }
 
     /**
@@ -225,9 +282,18 @@ public final class MarioController extends Component implements ICollisionListen
     /**
      * Called when Mario lands on ground
      */
-    private void onLanded() {
+    private void onLanded(Transform transform) {
         isJumping = false;
         canDash = true;
+        if (particleSystem != null) {
+            // Landing dust cloud
+            particleSystem.emitBurst(
+                    transform.position.x + 16,
+                    transform.position.y,
+                    15,
+                    ParticleConfig.landDust()
+            );
+        }
     }
 
     // ✅ COLLISION CALLBACKS
@@ -245,6 +311,22 @@ public final class MarioController extends Component implements ICollisionListen
                 rb.velocity.y = 0;
             }
         }
+        // ✨ Wall slide particles
+        if ((collision.isFromLeft() || collision.isFromRight()) && particleSystem != null) {
+            Transform transform = owner.getComponent(Transform.class);
+            if (transform != null) {
+                wallSlideTimer += 0.016f; // Approximate frame time
+                if (wallSlideTimer > 0.1f) {
+                    particleSystem.emitBurst(
+                            transform.position.x + (collision.isFromLeft() ? 0 : 32),
+                            transform.position.y + 24,
+                            2,
+                            ParticleConfig.wallSlide()
+                    );
+                    wallSlideTimer = 0f;
+                }
+            }
+        }
     }
 
     @Override
@@ -258,7 +340,7 @@ public final class MarioController extends Component implements ICollisionListen
         groundContacts.remove(other);
     }
 
-    private void startDash() {
+    private void startDash(Transform transform) {
         dashDirX = 0;
         dashDirY = 0;
 
@@ -281,6 +363,14 @@ public final class MarioController extends Component implements ICollisionListen
         dashTimer = dashDuration;
         canDash = false;
         isJumping = false;
+        if (particleSystem != null) {
+            particleSystem.emitBurst(
+                    transform.position.x + 16,
+                    transform.position.y + 24,
+                    12,
+                    ParticleConfig.dashTrail()
+            );
+        }
     }
 
     private void updateAnimation(String anim) {
@@ -312,6 +402,18 @@ public final class MarioController extends Component implements ICollisionListen
     public void powerUp() {
         currentState = bigState;
         currentState.onEnter();
+        // ✨ Power-up particles!
+        if (particleSystem != null) {
+            Transform transform = owner.getComponent(Transform.class);
+            if (transform != null) {
+                particleSystem.emitBurst(
+                        transform.position.x + 16,
+                        transform.position.y + 24,
+                        20,
+                        ParticleConfig.powerUpGlow()
+                );
+            }
+        }
     }
 
     public void takeDamage() {

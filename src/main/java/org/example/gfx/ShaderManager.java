@@ -74,6 +74,17 @@ public final class ShaderManager implements AutoCloseable {
                 Shaders.CHROMATIC_ABERRATION_FRAG,
                 false
         ));
+        shaders.put("bloom_extract", new Shader(
+                Shaders.POSTPROCESS_VERT,
+                Shaders.BLOOM_EXTRACT_FRAG,
+                false
+        ));
+
+        shaders.put("bloom_combine", new Shader(
+                Shaders.POSTPROCESS_VERT,
+                Shaders.BLOOM_COMBINE_FRAG,
+                false
+        ));
     }
 
     public Shader get(String name) {
