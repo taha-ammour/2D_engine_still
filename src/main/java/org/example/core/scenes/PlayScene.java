@@ -4,6 +4,7 @@ package org.example.core.scenes;
 import org.example.ecs.GameObject;
 import org.example.ecs.components.*;
 import org.example.effects.*;
+import org.example.engine.WindowResizeListener;
 import org.example.engine.input.Input;
 import org.example.engine.input.InputManager;
 import org.example.engine.input.Mouse;
@@ -38,7 +39,7 @@ import static org.lwjgl.opengl.GL11.glClear;
  * 2. Mario starts at Y=200 (well above ground)
  * 3. Collision detection includes better bounds checking
  */
-public final class PlayScene extends BaseScene {
+public final class PlayScene extends BaseScene implements WindowResizeListener {
     private final List<GameObject> gameObjects = new ArrayList<>();
     private GameObject marioObject;
     private MarioController marioController;
@@ -95,18 +96,22 @@ public final class PlayScene extends BaseScene {
         // ✨ Initialize trail renderer
         trailRenderer = new TrailRenderer(renderer);
 
-        // ✨ Initialize bloom (optional)
         try {
-            sceneBuffer = new Framebuffer(1280, 720);
-            bloomEffect = new BloomEffect(1280, 720);
+            // ✅ Use camera's current dimensions instead of hardcoded 1280x720
+            int width = camera.getWidth();
+            int height = camera.getHeight();
+
+            sceneBuffer = new Framebuffer(width, height);
+            bloomEffect = new BloomEffect(width, height);
             bloomEffect.setThreshold(0.6f);
             bloomEffect.setIntensity(0.7f);
             bloomEffect.setBlurPasses(3);
+
+            System.out.println("✨ Bloom initialized with dynamic size: " + width + "x" + height);
         } catch (Exception e) {
             System.err.println("⚠️  Bloom not available (non-critical): " + e.getMessage());
             bloomEnabled = false;
         }
-
 
         // Add spawn listener for debugging
         blockSpawner.addListener(new BlockSpawnListener() {
@@ -172,6 +177,20 @@ public final class PlayScene extends BaseScene {
         System.out.println("✅ PlayScene loaded successfully!");
         System.out.println("📊 Total GameObjects: " + gameObjects.size());
         System.out.println("🎮 Controls: Arrow Keys/WASD=Move, Space/W/Up=Jump, Shift/X/C=Dash, F3=Debug");
+    }
+
+    public void onWindowResize(int newWidth, int newHeight) {
+        // Resize the scene framebuffer
+        if (sceneBuffer != null) {
+            sceneBuffer.resize(newWidth, newHeight);
+        }
+
+        // Resize the bloom effect
+        if (bloomEffect != null) {
+            bloomEffect.resize(newWidth, newHeight);
+        }
+
+        System.out.println("🎮 PlayScene resized to: " + newWidth + "x" + newHeight);
     }
 
     private void spawnBlockAtMario() {
@@ -531,8 +550,8 @@ public final class PlayScene extends BaseScene {
 
         // Smooth camera follow
         if (marioTransform != null) {
-            float targetX = marioTransform.position.x - 400;
-            float targetY = 0;
+            float targetX = marioTransform.position.x - (float) camera.getWidth() /2;
+            float targetY = marioTransform.position.y - (float) camera.getHeight() /4;
             float lerpSpeed = 0.1f;
 
             Vector2f camPos = camera.getPosition();
@@ -567,7 +586,7 @@ public final class PlayScene extends BaseScene {
 
         // Apply bloom
         if (bloomEnabled && sceneBuffer != null && bloomEffect != null) {
-            bloomEffect.apply(sceneBuffer.getColorTexture(), 1280, 720);
+            bloomEffect.apply(sceneBuffer.getColorTexture(), camera.getWidth(), camera.getHeight());
         }
     }
 

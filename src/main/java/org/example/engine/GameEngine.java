@@ -14,7 +14,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Single Responsibility: Manages the game loop and engine lifecycle
- * Open/Closed: Extensible through resize listeners and scene system
+ * ✅ FIXED: Proper window resize handling with camera updates
  */
 public final class GameEngine implements AutoCloseable {
     private final Window window;
@@ -22,7 +22,6 @@ public final class GameEngine implements AutoCloseable {
     private final Camera2D camera;
     private final SceneManager sceneManager;
     private final GameTime gameTime;
-    private final Mouse mouse;
 
     private boolean running = false;
     private static final double FIXED_TIMESTEP = 1.0 / 60.0;
@@ -33,7 +32,6 @@ public final class GameEngine implements AutoCloseable {
         this.renderer = new Renderer2D(camera);
         this.sceneManager = new SceneManager();
         this.gameTime = new GameTime();
-        this.mouse = null; // Will be initialized after window creation
     }
 
     public void init() {
@@ -42,22 +40,11 @@ public final class GameEngine implements AutoCloseable {
         // Now that OpenGL context exists, initialize renderer
         renderer.init();
 
-        // ✅ Register camera as resize listener
+        // ✅ FIXED: Register camera as resize listener
         window.addResizeListener(new WindowResizeListener() {
             @Override
             public void onWindowResize(int newWidth, int newHeight) {
                 camera.resize(newWidth, newHeight);
-                System.out.println("📷 Camera resized to: " + newWidth + "x" + newHeight);
-            }
-        });
-
-        // ✅ Register renderer as resize listener (if it needs to resize framebuffers, etc.)
-        window.addResizeListener(new WindowResizeListener() {
-            @Override
-            public void onWindowResize(int newWidth, int newHeight) {
-                // Renderer can handle any resize-specific logic here
-                // For example, recreating framebuffers
-                System.out.println("🎨 Renderer notified of resize: " + newWidth + "x" + newHeight);
             }
         });
 
@@ -76,6 +63,8 @@ public final class GameEngine implements AutoCloseable {
         double accumulator = 0.0;
         double currentTime = glfwGetTime();
 
+        System.out.println("🎮 Game loop started - resize window to test!");
+
         while (running && !window.shouldClose()) {
             double newTime = glfwGetTime();
             double frameTime = newTime - currentTime;
@@ -86,8 +75,11 @@ public final class GameEngine implements AutoCloseable {
 
             window.pollEvents();
 
-            // ✅ Handle window resize (triggers listeners)
-            window.wasResized();
+            // ✅ FIXED: Check for resize and update systems
+            if (window.wasResized()) {
+                // Resize was handled, camera was notified via listener
+                System.out.println("🔄 Resize detected in game loop - systems updated!");
+            }
 
             processInput();
 
@@ -101,6 +93,7 @@ public final class GameEngine implements AutoCloseable {
             glClearColor(0.10f, 0.12f, 0.16f, 1f);
             glClear(GL_COLOR_BUFFER_BIT);
 
+            // ✅ Pass current window dimensions to renderer
             renderer.begin(window.width(), window.height());
             sceneManager.renderCurrent();
             renderer.end();

@@ -6,17 +6,29 @@ import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Framebuffer for rendering to textures
- * Used for post-processing effects like bloom
+ * ✅ FIXED: Now supports resizing!
  */
 public final class Framebuffer implements AutoCloseable {
-    private final int fbo;
-    private final int colorTexture;
-    private final int width;
-    private final int height;
+    private int fbo;
+    private int colorTexture;
+    private int width;
+    private int height;
 
     public Framebuffer(int width, int height) {
         this.width = width;
         this.height = height;
+        create();
+    }
+
+    /**
+     * Create/recreate the framebuffer with current dimensions
+     */
+    private void create() {
+        // If this is a recreation, delete old resources first
+        if (fbo != 0) {
+            glDeleteTextures(colorTexture);
+            glDeleteFramebuffers(fbo);
+        }
 
         // Create framebuffer
         fbo = glGenFramebuffers();
@@ -42,6 +54,19 @@ public final class Framebuffer implements AutoCloseable {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    /**
+     * ✅ FIXED: Resize the framebuffer
+     * Recreates the framebuffer and texture with new dimensions
+     */
+    public void resize(int newWidth, int newHeight) {
+        if (newWidth > 0 && newHeight > 0 && (newWidth != width || newHeight != height)) {
+            this.width = newWidth;
+            this.height = newHeight;
+            create();
+            System.out.println("🖼️  Framebuffer resized to: " + width + "x" + height);
+        }
+    }
+
     public void bind() {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glViewport(0, 0, width, height);
@@ -63,7 +88,9 @@ public final class Framebuffer implements AutoCloseable {
 
     @Override
     public void close() {
-        glDeleteTextures(colorTexture);
-        glDeleteFramebuffers(fbo);
+        if (colorTexture != 0) glDeleteTextures(colorTexture);
+        if (fbo != 0) glDeleteFramebuffers(fbo);
+        colorTexture = 0;
+        fbo = 0;
     }
 }

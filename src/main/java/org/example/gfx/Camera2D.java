@@ -4,19 +4,22 @@ package org.example.gfx;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 
+/**
+ * 2D Camera with FIXED resize support
+ * Maintains proper orthographic projection when window resizes
+ */
 public final class Camera2D {
     private final Matrix4f proj = new Matrix4f();
     private final Matrix4f view = new Matrix4f();
     private final Vector2f position = new Vector2f();
     private int width, height;
 
-
     public Camera2D(int width, int height) {
-        // origin at (0,0) bottom-left; y up
         this.width = width;
         this.height = height;
         updateProjection();
         view.identity();
+        System.out.println("📷 Camera initialized: " + width + "x" + height);
     }
 
     private void updateProjection() {
@@ -29,10 +32,17 @@ public final class Camera2D {
         view.identity().translate(-position.x, -position.y, 0f);
     }
 
+    /**
+     * ✅ FIXED: Resize camera projection matrix
+     * Call this when window is resized to update the orthographic projection
+     */
     public void resize(int width, int height) {
-        this.width = width;
-        this.height = height;
-        updateProjection();
+        if (width > 0 && height > 0) {
+            this.width = width;
+            this.height = height;
+            updateProjection();
+            System.out.println("📷 Camera resized to: " + width + "x" + height);
+        }
     }
 
     public Matrix4f projection() { return proj; }
@@ -40,6 +50,4 @@ public final class Camera2D {
     public Vector2f getPosition() { return position; }
     public int getWidth() { return width; }
     public int getHeight() { return height; }
-
-
 }

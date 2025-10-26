@@ -13,12 +13,10 @@ public class Main {
     public static void main(String[] args) {
         System.out.println("🎮 Starting MarioRev with Window Resize + Mouse Support...");
 
-        GameEngine engine = new GameEngine(1280, 720, "MarioRev - Resizable + Mouse");
+        GameEngine engine = new GameEngine(720, 480, "Unbeatable");
 
-        // Initialize window and OpenGL context first!
         engine.init();
 
-        // ✅ Now create input systems (after window is initialized)
         Input input = new Input(engine.getWindow().handle());
         Mouse mouse = new Mouse(engine.getWindow().handle());
 

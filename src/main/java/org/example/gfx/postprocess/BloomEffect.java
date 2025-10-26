@@ -11,16 +11,16 @@ import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Bloom post-processing effect
- * Creates glow around bright areas
+ * ✅ FIXED: Now supports window resizing!
  */
 public final class BloomEffect implements AutoCloseable {
     private final Shader brightPassShader;
     private final Shader blurShader;
     private final Shader combineShader;
 
-    private final Framebuffer brightPass;
-    private final Framebuffer blurH;
-    private final Framebuffer blurV;
+    private Framebuffer brightPass;
+    private Framebuffer blurH;
+    private Framebuffer blurV;
 
     private final int quadVAO;
     private final int quadVBO;
@@ -29,7 +29,13 @@ public final class BloomEffect implements AutoCloseable {
     private float intensity = 1.0f;
     private int blurPasses = 2;
 
+    private int currentWidth;
+    private int currentHeight;
+
     public BloomEffect(int width, int height) {
+        this.currentWidth = width;
+        this.currentHeight = height;
+
         // Create shaders
         brightPassShader = new Shader(
                 Shaders.POSTPROCESS_VERT,
@@ -49,8 +55,8 @@ public final class BloomEffect implements AutoCloseable {
                 false
         );
 
-        // Create framebuffers
-        brightPass = new Framebuffer(width / 2, height / 2); // Half resolution for performance
+        // Create framebuffers (half resolution for performance)
+        brightPass = new Framebuffer(width / 2, height / 2);
         blurH = new Framebuffer(width / 2, height / 2);
         blurV = new Framebuffer(width / 2, height / 2);
 
@@ -82,10 +88,32 @@ public final class BloomEffect implements AutoCloseable {
     }
 
     /**
+     * ✅ FIXED: Resize all bloom framebuffers
+     * Call this when the window is resized
+     */
+    public void resize(int newWidth, int newHeight) {
+        if (newWidth > 0 && newHeight > 0 && (newWidth != currentWidth || newHeight != currentHeight)) {
+            currentWidth = newWidth;
+            currentHeight = newHeight;
+
+            // Resize all framebuffers to half resolution
+            int halfWidth = newWidth / 2;
+            int halfHeight = newHeight / 2;
+
+            brightPass.resize(halfWidth, halfHeight);
+            blurH.resize(halfWidth, halfHeight);
+            blurV.resize(halfWidth, halfHeight);
+
+            System.out.println("✨ BloomEffect resized to: " + newWidth + "x" + newHeight +
+                    " (bloom buffers: " + halfWidth + "x" + halfHeight + ")");
+        }
+    }
+
+    /**
      * Apply bloom to the input texture
      */
     public void apply(int sourceTexture, int screenWidth, int screenHeight) {
-        // 1. Extract bright pixels
+        // 1. Extract bright areas
         brightPass.bind();
         glClear(GL_COLOR_BUFFER_BIT);
         brightPassShader.bind();
@@ -97,7 +125,7 @@ public final class BloomEffect implements AutoCloseable {
 
         renderQuad();
 
-        // 2. Blur bright pixels (multi-pass)
+        // 2. Blur horizontally and vertically (multiple passes for stronger blur)
         for (int i = 0; i < blurPasses; i++) {
             // Horizontal blur
             blurH.bind();

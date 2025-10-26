@@ -9,10 +9,9 @@ import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL43.*;
 
 /**
- * Window management with resize event support
+ * Window management with FIXED resize event support
  * Open/Closed Principle: Extensible through listeners, closed for modification
  */
 public final class Window implements AutoCloseable {
@@ -50,11 +49,16 @@ public final class Window implements AutoCloseable {
         glfwSwapInterval(1);
         GL.createCapabilities();
 
-        // ✅ Setup resize callback
+        // ✅ FIXED: Setup resize callback with immediate viewport update
         glfwSetFramebufferSizeCallback(handle, (window, w, h) -> {
-            this.newWidth = w;
-            this.newHeight = h;
-            this.resized = true;
+            if (w > 0 && h > 0) {  // Ignore zero-size windows
+                this.newWidth = w;
+                this.newHeight = h;
+                this.resized = true;
+
+                // ✅ IMMEDIATELY update viewport on resize callback
+                glViewport(0, 0, w, h);
+            }
         });
 
         glfwShowWindow(handle);
@@ -68,15 +72,14 @@ public final class Window implements AutoCloseable {
 
     /**
      * Check if window was resized and notify listeners
-     * Open/Closed: New listeners can be added without modifying this method
+     * ✅ FIXED: Proper handling of resize events
      */
     public boolean wasResized() {
         if (resized) {
             width = newWidth;
             height = newHeight;
-            glViewport(0, 0, width, height);
 
-            // ✅ Notify all listeners
+            // Viewport was already updated in callback, just notify listeners
             notifyResizeListeners(width, height);
 
             resized = false;
@@ -116,6 +119,7 @@ public final class Window implements AutoCloseable {
             } catch (Exception e) {
                 System.err.println("⚠️ Error in resize listener " +
                         listener.getClass().getSimpleName() + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }
