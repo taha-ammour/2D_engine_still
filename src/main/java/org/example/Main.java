@@ -1,23 +1,40 @@
-// Updated Main.java to use new engine
+// src/main/java/org/example/Main.java
 package org.example;
 
 import org.example.engine.GameEngine;
 import org.example.core.scenes.PlayScene;
 import org.example.engine.input.Input;
+import org.example.engine.input.Mouse;
 
+/**
+ * Application entry point with proper initialization order
+ */
 public class Main {
     public static void main(String[] args) {
-        GameEngine engine = new GameEngine(1280, 720, "MarioRev");
-        engine.init(); // Initialize window and OpenGL context first!
+        System.out.println("🎮 Starting MarioRev with Window Resize + Mouse Support...");
+
+        GameEngine engine = new GameEngine(1280, 720, "MarioRev - Resizable + Mouse");
+
+        // Initialize window and OpenGL context first!
+        engine.init();
+
+        // ✅ Now create input systems (after window is initialized)
+        Input input = new Input(engine.getWindow().handle());
+        Mouse mouse = new Mouse(engine.getWindow().handle());
+
+        System.out.println("✅ Input systems initialized (Keyboard + Mouse)");
 
         // Now it's safe to create scenes that use the renderer
         PlayScene playScene = new PlayScene(
-                new Input(engine.getWindow().handle()),
+                input,
+                mouse,  // ✅ Pass mouse to scene
                 engine.getRenderer(),
                 engine.getCamera()
         );
 
         engine.start(playScene);
         engine.close();
+
+        System.out.println("👋 MarioRev closed");
     }
 }

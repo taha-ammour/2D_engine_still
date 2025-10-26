@@ -6,6 +6,7 @@ import org.example.ecs.components.*;
 import org.example.effects.*;
 import org.example.engine.input.Input;
 import org.example.engine.input.InputManager;
+import org.example.engine.input.Mouse;
 import org.example.game.blocks.BlockFactory;
 import org.example.game.blocks.BlockSpawner;
 import org.example.game.blocks.BlockSpawnListener;
@@ -67,8 +68,8 @@ public final class PlayScene extends BaseScene {
     private boolean bloomEnabled = true;
 
 
-    public PlayScene(Input input, Renderer2D renderer, Camera2D camera) {
-        super(input, renderer, camera);
+    public PlayScene(Input input, Mouse mouse, Renderer2D renderer, Camera2D camera) {
+        super(input, mouse, renderer, camera);
     }
 
     @Override
@@ -133,7 +134,7 @@ public final class PlayScene extends BaseScene {
         // Initialize debug renderer
         debugRenderer = new CollisionDebugRenderer(renderer);
 
-        inputManager = new InputManager(input);
+        inputManager = new InputManager(input, mouse);
 
         // Movement keys
         inputManager.bindKey(GLFW_KEY_RIGHT, dt -> marioController.moveRight());
@@ -489,6 +490,7 @@ public final class PlayScene extends BaseScene {
     @Override
     public void handleInput() {
         input.update();
+        mouse.update();
 
         if (input.isKeyReleased(GLFW_KEY_SPACE) ||
                 input.isKeyReleased(GLFW_KEY_W) ||
